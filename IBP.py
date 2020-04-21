@@ -49,13 +49,22 @@ class IBP:
         if mk == 0:
             self.Z[i, k] = 0
         else:
-            logpratio = ... + np.log(mk) - np.log(self.N - mk)
-            self.Z[i, k] = self.binary(logpratio, "logdiff")
+            Z0 = IBP.copy(self.Z)
+            Z0[i, k] = 0
+            Z1 = IBP.copy(self.Z)
+            Z1[i, k] = 1
+            logpratio = self.lp(Z1) - self.lp(Z0) + np.log(mk) - np.log(self.N - mk)
+            self.Z[i, k] = IBP.binary(logpratio, "logdiff")
     
     def lp(self, Z):
         K = Z.shape[1]
-        det = np.linalg.det(Z.T @ Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(self.D))
-    return -self.N*self.D/2*np.log(2*np.pi) - (self.N-K)*self.D*np.log(self.sigma_X) - K*self.D*np.log(self.sigma_A) - self.D/2*np.log(det) - 1/(2*self.sigma_X**2) * np.trace(self.X.T @ (np.eye(self.D) - Z @ np.linalg.inv(Z.T @ Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(self.D)) @ Z.T) @ self.X)  
+        invMat = np.linalg.inv(Z.T @ Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(self.D))
+        res = - self.N * self.D / 2 * np.log( 2 * np.pi)
+        res -= (self.N - K) * self.D * np.log(self.sigma_X)
+        res -= K * self.D * np.log(self.sigma_A)
+        res += self.D / 2 * np.log(np.linalg.det(invMat))
+        res -= 1 / (2 * self.sigma_X**2) * np.trace(self.X.T @ (np.eye(self.N) - Z @ invMat @ Z.T) @ self.X)
+        return res
 
     def sampleK(self, i):
         pass
@@ -77,3 +86,14 @@ class IBP:
             p = np.exp(p) / (1 + np.exp(p))
         return np.random.random() < p
     
+    @staticmethod
+    def copy(mat):
+        return mat + 0
+
+    @staticmethod
+    def append(Z, i, K_new):
+        N, K = Z.shape
+        _Z = np.zeros((N, K + K_new))
+        _Z[:, :K] = Z
+        _Z[i, K:] = 1
+        return _Z
