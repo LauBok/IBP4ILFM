@@ -44,8 +44,13 @@ class IBP:
 
     def sampleZ(self, i, k):
         # Use formula (9) to update Z_{ik}
-        # delete pass when you implement this
-        pass
+        mk = sum(self.Z[:, k]) - self.Z[i, k]
+        ## The column only has this non-zero entry.
+        if mk == 0:
+            self.Z[i, k] = 0
+        else:
+            logpratio = ... + np.log(mk) - np.log(self.N - mk)
+            self.Z[i, k] = self.binary(logpratio, "logdiff")
     
     def sampleK(self, i):
         pass
