@@ -60,10 +60,10 @@ class IBP:
     def binary(p, type = None):
         if type is None:
             assert(0 <= p <= 1)
-        elif type is 'log':
+        elif type == 'log':
             assert(p <= 0)
             p = np.exp(p)
-        elif type is 'logdiff':
+        elif type == 'logdiff':
             p = np.exp(p) / (1 + np.exp(p))
         return np.random.random() < p
     
