@@ -52,6 +52,11 @@ class IBP:
             logpratio = ... + np.log(mk) - np.log(self.N - mk)
             self.Z[i, k] = self.binary(logpratio, "logdiff")
     
+    def lp(self, Z):
+        K = Z.shape[1]
+        det = np.linalg.det(Z.T @ Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(self.D))
+    return -self.N*self.D/2*np.log(2*np.pi) - (self.N-K)*self.D*np.log(self.sigma_X) - K*self.D*np.log(self.sigma_A) - self.D/2*np.log(det) - 1/(2*self.sigma_X**2) * np.trace(self.X.T @ (np.eye(self.D) - Z @ np.linalg.inv(Z.T @ Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(self.D)) @ Z.T) @ self.X)  
+
     def sampleK(self, i):
         pass
     
