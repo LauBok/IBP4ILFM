@@ -14,6 +14,20 @@ class IBP:
         else:
             self.alpha = alpha
             self.alpha_update = False
+        if type(sigma_X) is tuple:
+            self.sigma_X_a, self.sigma_X_b = sigma_X
+            self.sigma_X = np.random.gamma(*sigma_X)
+            self.sigma_X_update = True
+        else:
+            self.sigma_X = sigma_X
+            self.sigma_X_update = False
+        if type(sigma_A) is tuple:
+            self.sigma_A_a, self.sigma_A_b = sigma_A
+            self.sigma_A = np.random.gamma(*sigma_A)
+            self.sigma_A_update = True
+        else:
+            self.sigma_A = sigma_A
+            self.sigma_A_update = False
         if Z is None:
             self.initZ()
         else:
@@ -58,16 +72,27 @@ class IBP:
             for k in range(self.K):
                 self.sampleZ(i, k)
             self.sampleK(i)
-        self.sampleAlpha()
+        if self.alpha_update:
+            self.sampleAlpha()
+        if self.sigma_X_update:
+            self.sampleSigmaX()
+        if self.sigma_A_update:
+            self.sampleSigmaA()
 
-    def lp(self, Z):
+    def lp(self, Z = None, sigma_X = None, sigma_A = None):
+        if Z is None:
+            Z = self.Z
+        if sigma_X is None:
+            sigma_X = self.sigma_X
+        if sigma_A is None:
+            sigma_A = self.sigma_A
         K = Z.shape[1]
-        invMat = np.linalg.inv(Z.T @ Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(K))
+        invMat = np.linalg.inv(Z.T @ Z + sigma_X**2 / sigma_A**2 * np.eye(K))
         res = - self.N * self.D / 2 * np.log(2 * np.pi)
-        res -= (self.N - K) * self.D * np.log(self.sigma_X)
-        res -= K * self.D * np.log(self.sigma_A)
+        res -= (self.N - K) * self.D * np.log(sigma_X)
+        res -= K * self.D * np.log(sigma_A)
         res += self.D / 2 * np.log(np.linalg.det(invMat))
-        res -= 1 / (2 * self.sigma_X**2) * np.trace(self.X.T @ (np.eye(self.N) - Z @ invMat @ Z.T) @ self.X)
+        res -= 1 / (2 * sigma_X**2) * np.trace(self.X.T @ (np.eye(self.N) - Z @ invMat @ Z.T) @ self.X)
         return res
 
     def sampleZ(self, i, k):
@@ -107,18 +132,30 @@ class IBP:
         self.K = self.Z.shape[1]
     
     def sampleAlpha(self):
-        if self.alpha_update:
-            self.alpha = np.random.gamma(self.alpha_a + self.K, self.alpha_b + np.sum(1/np.arange(1, self.N + 1)))
+        self.alpha = np.random.gamma(self.alpha_a + self.K, self.alpha_b + np.sum(1/np.arange(1, self.N + 1)))
+
+    def sampleSigmaX(self, epsilon = 0.1):
+        new_sigma_X = IBP.wallRandomWalk(self.sigma_X, epsilon, wall = (0, None))
+        log_p = (self.sigma_X_a - 1) * (np.log(new_sigma_X) - np.log(self.sigma_X))
+        log_p -= self.sigma_X_b * (new_sigma_X - self.sigma_X)
+        log_p += self.lp(sigma_X = new_sigma_X) - self.lp()
+        if IBP.binary(log_p, type = 'log'):
+            self.sigma_X = new_sigma_X
+    
+    def sampleSigmaA(self, epsilon = 0.1):
+        new_sigma_A = IBP.wallRandomWalk(self.sigma_A, epsilon, wall = (0, None))
+        log_p = (self.sigma_A_a - 1) * (np.log(new_sigma_A) - np.log(self.sigma_A))
+        log_p -= self.sigma_A_b * (new_sigma_A - self.sigma_A)
+        log_p += self.lp(sigma_A = new_sigma_A) - self.lp()
+        if IBP.binary(log_p, type = 'log'):
+            self.sigma_A = new_sigma_A
 
     def postMean(self):
         return np.linalg.inv(self.Z.T @ self.Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(self.K)) @ self.Z.T @ self.X
 
     @staticmethod
     def binary(p, type = None):
-        if type is None:
-            assert(0 <= p <= 1)
-        elif type == 'log':
-            assert(p <= 0)
+        if type == 'log':
             p = np.exp(p)
         elif type == 'logdiff':
             p = np.exp(p) / (1 + np.exp(p))
@@ -135,5 +172,17 @@ class IBP:
         _Z[:, :K] = Z
         _Z[i, K:] = 1
         return _Z
+    
+    @staticmethod
+    def wallRandomWalk(X, eps, wall = (None, None)):
+        new_X = np.random.uniform(X - eps, X + eps)
+        left, right = wall
+        def walled(_):
+            if left is not None and _ < left:
+                return walled(2 * left - _)
+            if right is not None and _ > right:
+                return walled(2 * right - _)
+            return _
+        return walled(new_X)
 
 

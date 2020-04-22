@@ -55,10 +55,12 @@ X = D1 + D2 + D3 + D4 + D5 + 0.2
 X += np.random.normal(0, 0.1, X.shape)
 print(X.shape)
 
-ibp = IBP(X, alpha = (1,1), sigma_X = 0.1)
-history = ibp.MCMC(100)
-print(history["K"])
-print(history["alpha"])
+ibp = IBP(X, alpha = (1,1), sigma_X = (1,1), sigma_A = (1,1))
+history = ibp.MCMC(500)
+print("K", history["K"])
+print("alpha", history["alpha"])
+print("sigma_X", history["sigma_X"])
+print("sigma_A", history["sigma_A"])
 
 A = ibp.postMean()
 f = plt.figure(figsize = (8,8))
