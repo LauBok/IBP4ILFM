@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 
 class IBP:
     def __init__(self, X, Z = None, sigma_X = 1, sigma_A = 1, alpha = 1):
@@ -43,7 +44,7 @@ class IBP:
             'sigma_A': np.zeros(maxiter),
             'alpha': np.zeros(maxiter)
         }
-        for it in range(maxiter):
+        for it in tqdm(range(maxiter)):
             self.step()
             history['Z'][it] = self.Z * 1
             history['K'][it] = self.K
@@ -98,7 +99,7 @@ class IBP:
         log_prob -= np.max(log_prob)
         prob = np.exp(log_prob)
         prob /= np.sum(prob)
-        print(prob)
+
         ### sample using log_prob
         K_post = np.argmax(np.random.multinomial(len(prob), prob))
         m = np.sum(self.Z, axis = 0) - self.Z[i, :]
@@ -110,7 +111,7 @@ class IBP:
             self.alpha = np.random.gamma(self.alpha_a + self.K, self.alpha_b + np.sum(1/np.arange(1, self.N + 1)))
 
     def postMean(self):
-        return np.linalg.inv(self.Z.T @ self.Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(self.D)) @ self.Z.T @ self.X
+        return np.linalg.inv(self.Z.T @ self.Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(self.K)) @ self.Z.T @ self.X
 
     @staticmethod
     def binary(p, type = None):
@@ -135,8 +136,4 @@ class IBP:
         _Z[i, K:] = 1
         return _Z
 
-X = np.random.random((100,3)) @ np.random.random((3, 50))
-ibp = IBP(X, alpha = (1,1))
-history = ibp.MCMC(100)
-print(history["K"])
-print(history["alpha"])
+
