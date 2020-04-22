@@ -45,7 +45,7 @@ V5 = np.array([
 ])
 V = [V1, V2, V3, V4, V5]
 
-N = 100
+N = 200
 D1 = 0.6 * np.outer(np.random.binomial(1, 0.5, N), V1)
 D2 = 0.6 * np.outer(np.random.binomial(1, 0.5, N), V2)
 D3 = 0.6 * np.outer(np.random.binomial(1, 0.5, N), V3)

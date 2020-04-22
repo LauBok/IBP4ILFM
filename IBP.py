@@ -101,7 +101,7 @@ class IBP:
         prob /= np.sum(prob)
 
         ### sample using log_prob
-        K_post = np.argmax(np.random.multinomial(len(prob), prob))
+        K_post = np.argmax(np.random.multinomial(1, prob))
         m = np.sum(self.Z, axis = 0) - self.Z[i, :]
         self.Z = IBP.append(self.Z[:, m != 0], i, K_post)
         self.K = self.Z.shape[1]
