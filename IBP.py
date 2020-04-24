@@ -1,5 +1,6 @@
 import numpy as np
 from tqdm import tqdm
+import sys
 
 class IBP:
     def __init__(self, X, Z = None, sigma_X = 1, sigma_A = 1, alpha = 1):
@@ -7,6 +8,7 @@ class IBP:
         self.N, self.D = X.shape
         self.sigma_X = sigma_X
         self.sigma_A = sigma_A
+        self.trX = np.trace(self.X.T @ self.X)
         if type(alpha) is tuple:
             self.alpha_a, self.alpha_b = alpha
             self.alpha = np.random.gamma(*alpha)
@@ -58,7 +60,7 @@ class IBP:
             'sigma_A': np.zeros(maxiter),
             'alpha': np.zeros(maxiter)
         }
-        for it in tqdm(range(maxiter)):
+        for it in tqdm(range(maxiter), file = sys.stdout):
             self.step()
             history['Z'][it] = self.Z * 1
             history['K'][it] = self.K
@@ -69,8 +71,7 @@ class IBP:
     
     def step(self):
         for i in range(self.N):
-            for k in range(self.K):
-                self.sampleZ(i, k)
+            self.sampleZi(i)
             self.sampleK(i)
         if self.alpha_update:
             self.sampleAlpha()
@@ -79,7 +80,7 @@ class IBP:
         if self.sigma_A_update:
             self.sampleSigmaA()
 
-    def lp(self, Z = None, sigma_X = None, sigma_A = None):
+    def lp_original(self, Z = None, sigma_X = None, sigma_A = None):
         if Z is None:
             Z = self.Z
         if sigma_X is None:
@@ -94,7 +95,33 @@ class IBP:
         res += self.D / 2 * np.log(np.linalg.det(invMat))
         res -= 1 / (2 * sigma_X**2) * np.trace(self.X.T @ (np.eye(self.N) - Z @ invMat @ Z.T) @ self.X)
         return res
+        
+    def lp(self, Z = None, sigma_X = None, sigma_A = None):
+        if Z is None:
+            Z = self.Z
+        if sigma_X is None:
+            sigma_X = self.sigma_X
+        if sigma_A is None:
+            sigma_A = self.sigma_A
+        K = Z.shape[1]
+        
+        u, s, v = np.linalg.svd(Z,full_matrices=False)
+        det = np.prod(s**2 + sigma_X**2 / sigma_A**2 * np.ones(len(s)))
+        l = s**2 / (s**2 + sigma_X**2 / sigma_A**2 * np.ones(len(s)))
+        uTX = u.T @ self.X
+        uX = [np.linalg.norm(uTX[x,:])**2 for x in range(uTX.shape[0])]
+        
+        res = - self.N * self.D / 2 * np.log(2 * np.pi)
+        res -= (self.N - K) * self.D * np.log(sigma_X)
+        res -= K * self.D * np.log(sigma_A)
+        res -= self.D / 2 * np.log(det)
+        res -= 1 / (2 * sigma_X**2) * (self.trX - sum(l * uX))
+        return res
 
+    def sampleZi(self, i):
+        for k in range(self.K):
+            self.sampleZ(i, k)
+        
     def sampleZ(self, i, k):
         # Use formula (9) to update Z_{ik}
         mk = sum(self.Z[:, k]) - self.Z[i, k]
@@ -139,7 +166,7 @@ class IBP:
         log_p = (self.sigma_X_a - 1) * (np.log(new_sigma_X) - np.log(self.sigma_X))
         log_p -= self.sigma_X_b * (new_sigma_X - self.sigma_X)
         log_p += self.lp(sigma_X = new_sigma_X) - self.lp()
-        if IBP.binary(log_p, type = 'log'):
+        if IBP.binary(min(0,log_p), type = 'log'):
             self.sigma_X = new_sigma_X
     
     def sampleSigmaA(self, epsilon = 0.1):
@@ -147,7 +174,7 @@ class IBP:
         log_p = (self.sigma_A_a - 1) * (np.log(new_sigma_A) - np.log(self.sigma_A))
         log_p -= self.sigma_A_b * (new_sigma_A - self.sigma_A)
         log_p += self.lp(sigma_A = new_sigma_A) - self.lp()
-        if IBP.binary(log_p, type = 'log'):
+        if IBP.binary(min(0,log_p), type = 'log'):
             self.sigma_A = new_sigma_A
 
     def postMean(self):
