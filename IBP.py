@@ -1,5 +1,6 @@
 import numpy as np
 from tqdm import tqdm
+import random
 import sys
 
 class IBP:
@@ -70,8 +71,8 @@ class IBP:
         return history
     
     def step(self):
-        for i in range(self.N):
-            self.sampleZi(i)
+        for i in random.sample(range(self.N), self.N):
+            self.sampleZ(i)
             self.sampleK(i)
         if self.alpha_update:
             self.sampleAlpha()
@@ -105,24 +106,24 @@ class IBP:
             sigma_A = self.sigma_A
         K = Z.shape[1]
         
-        u, s, v = np.linalg.svd(Z,full_matrices=False)
-        det = np.prod(s**2 + sigma_X**2 / sigma_A**2 * np.ones(len(s)))
-        l = s**2 / (s**2 + sigma_X**2 / sigma_A**2 * np.ones(len(s)))
+        u, s, _ = np.linalg.svd(Z,full_matrices=False)
+        det = np.sum(np.log(s**2 + sigma_X**2 / sigma_A**2))
+        l = s**2 / (s**2 + sigma_X**2 / sigma_A**2)
         uTX = u.T @ self.X
-        uX = [np.linalg.norm(uTX[x,:])**2 for x in range(uTX.shape[0])]
-        
+        uX = np.sum(uTX ** 2, axis = 1)
+
         res = - self.N * self.D / 2 * np.log(2 * np.pi)
-        res -= (self.N - K) * self.D * np.log(sigma_X)
+        res -= (self.N - self.K) * self.D * np.log(sigma_X)
         res -= K * self.D * np.log(sigma_A)
-        res -= self.D / 2 * np.log(det)
+        res -= self.D / 2 * det
         res -= 1 / (2 * sigma_X**2) * (self.trX - sum(l * uX))
         return res
 
-    def sampleZi(self, i):
+    def sampleZ(self, i):
         for k in range(self.K):
-            self.sampleZ(i, k)
+            self._sampleZ(i, k)
         
-    def sampleZ(self, i, k):
+    def _sampleZ(self, i, k):
         # Use formula (9) to update Z_{ik}
         mk = sum(self.Z[:, k]) - self.Z[i, k]
         ## The column only has this non-zero entry.
@@ -135,8 +136,39 @@ class IBP:
             Z1[i, k] = 1
             logpratio = self.lp(Z1) - self.lp(Z0) + np.log(mk) - np.log(self.N - mk)
             self.Z[i, k] = IBP.binary(logpratio, "logdiff")
-    
+
     def sampleK(self, i, log_thres = -16):
+        log_prob = np.array([0])
+        lmd = self.alpha / self.N
+        e = np.zeros(self.Z.shape[0])
+        e[i] = 1
+        U, S, _ = np.linalg.svd(self.Z, full_matrices = False)
+        d = S ** 2 / (S ** 2 + self.sigma_X**2/self.sigma_A**2)
+        gamma_i = U @ (d * U[i,])
+        cur_diff = cnt = 0
+        while cur_diff > log_thres:
+            cnt += 1
+            mu = 1 + self.sigma_X**2/self.sigma_A**2 - gamma_i[i]
+            t = 1/mu * np.sum((self.X.T @ gamma_i - self.X[i])**2)
+            cur_diff += self.D * np.log(self.sigma_X / self.sigma_A)
+            cur_diff -= self.D / 2 * np.log(mu) 
+            cur_diff += t / (2 * self.sigma_X**2)
+            cur_diff += np.log(lmd) - np.log(cnt)
+            gamma_i += 1/mu * (gamma_i[i] - 1) * (gamma_i - e)
+            log_prob.append(cur_diff)
+        
+        # avoid overflow/underflow error
+        log_prob -= np.max(log_prob)
+        prob = np.exp(log_prob)
+        prob /= np.sum(prob)
+
+        ### sample using log_prob
+        K_post = np.argmax(np.random.multinomial(1, prob))
+        m = np.sum(self.Z, axis = 0) - self.Z[i, :]
+        self.Z = IBP.append(self.Z[:, m != 0], i, K_post)
+        self.K = self.Z.shape[1]
+        
+    def sampleK_original(self, i, log_thres = -16):
         log_prob = np.array([])
         K_new = 0
         lmd = self.alpha / self.N
