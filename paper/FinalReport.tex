@@ -1,0 +1,390 @@
+\documentclass{article}
+
+% if you need to pass options to natbib, use, e.g.:
+\PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2019
+
+% ready for submission
+% \usepackage{neurips_2019}
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+%     \usepackage[preprint]{neurips_2019}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+\usepackage[final]{finalreport} 
+\usepackage{xcolor}
+% to avoid loading the natbib package, add option nonatbib:
+%     \usepackage[nonatbib]{neurips_2019}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage[ruled,linesnumbered]{algorithm2e}
+\usepackage{multirow}
+\usepackage[toc,page]{appendix}
+\title{Gibbs Sampler for Infinite Latent Feature Models}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+\author{%
+  Bo Liu \\
+  Department of Statistical Science\\
+  Duke University\\
+  Durham, NC 27705 \\
+  \texttt{bl226@duke.edu} \\
+  \And
+  Linlin Li \\
+  Department of Statistical Science\\
+  Duke University\\
+  Durham, NC 27705 \\
+  \texttt{linlin.li434@duke.edu} \\
+  % examples of more authors
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \AND
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+  \textcolor{red}{The abstract paragraph should be indented \nicefrac{1}{2}~inch (3~picas) on
+  both the left- and right-hand margins. Use 10~point type, with a vertical
+  spacing (leading) of 11~points.  The word \textbf{Abstract} must be centered,
+  bold, and in point size 12. Two line spaces precede the abstract. The abstract
+  must be limited to one paragraph.}
+\end{abstract}
+
+\section{Background}
+
+Clustering is a set of methods that have been extensively studied and used in unsupervised learning since its first appearance in 1954 \citep{caron2018deep}. A large number of these methods assume that each observation belongs to one of some mutually exclusive clusters and attempt to classify the observations, although the classification can be deterministic (e.g. K means \citep{steinhaus1956division, lloyd1982least}) of probabilistic (e.g. Latent Dirichlet Allocation \citep{blei2003latent}). However, many datasets do not intrinsically satisfy the assumption. Instead, they share multiple latent features and each observation contains a subset of these features. An example is in image detection where the aim is to identify and position items in images \citep{zhang2018multilabel}. Multi-labeled data are also common in recommendation system, where each item is related to multiple tags \citep{zheng2014context}.
+
+All of these methods confront the critical challenge to determine how many latent features are necessary to model the hidden structure beyond the data. Usually, models with various number of latent features are tested and the optimal dimensionality is chosen based upon some metric on complexity or generalizaion error. In a Bayesian context, the dimensionality is controlled by both the prior belief and the data. Under this setting, the number of latent features can be infinite, and the data only reveal a finite subset of these features \citep{rasmussen2001occam}, such as Dirichlet process mixture models \citep{antoniak1974mixtures}. In a Dirichlet process mixture model, each object belongs to one of the latent classes, and each latent class defines a distribution over all latent features. The prior distribution of each class, which is a Dirichlet Process, is discrete with probability 1, but takes non-zero probability at infinite values \citep{teh2010dirichlet}, assuring Dirichlet process mixture models to have infinite underlying features \citep{rasmussen2000infinite}. Beta process can be the prior distribution on the probability of each latent feature if each observation has multiple features \citep{JMLR:v12:griffiths11a}. Similarly, such models also have infinite dimensionality in the latent features.
+
+Dirichlet and Beta process have been studied as priors in non-parametric Bayesian modelling. Both processes can be reparameterized with stick breaking processes \citep{broderick2012beta, paisley2011stick}. Moreover, these processes can be specified by sequential processes, respectively, the Chinese restaurant process \citep{griffiths2004hierarchical} and the Indian Buffet process \citep{thibaux2007hierarchical}. 
+
+\citet{ghahramani2006infinite} describes how Indian buffet process can be used as a prior in statistical models where each object is represented by a subset of infinite features \citep[also see][]{griffiths2005infinite}. In this paper, we implement a Gibbs sampler which generates Dirichlet process as a prior and samples from the posterior distribution. The article is organized as follows. \textcolor{red}{Description, Optimization, Simulation, Application, Analysis, Discussion.}
+
+
+\section{Description of the algorithm}
+
+We implemented a Gibbs sampler on a linear-Gaussian binary latent feature model, where each observation is assumed to contain some of underlying features. The prior on the feature matrix is Gaussian, and the prior on the (binary) indicator matrix is a Dirichlet process. Our sampler is able to sample the indicators and the features from their posterior distributions.
+
+\subsection{Notations and conventions}
+
+Suppose $\mathbf{X}$ is an $N\times D$ matrix of objects, each row being an observation consisting of $D$ components. The underlying latent features, which also lie in $\mathbb{R}^D$, are denoted as $\mathbf{A} \in \mathbb{R}^{K\times D}$, $K$ being the total number of features revealed by the data. Note that $K$ may vary during the sampling and there is a prior on it. $\mathbf{Z}$ is an $N\times K$ indicator matrix consisting of $0$'s and $1$'s, indicating whether an observation contains some certain feature.
+
+Any vector without subscripts or superscripts should be considered a column vector unless specified. For any matrix $\mathbf{X}$, the $i$-th row is denoted as $\boldsymbol{x}_{i\cdot}$ and the $j$-th column is denoted as $\boldsymbol{x}_{\cdot j}$. The $(i,j)$-th entry of $\mathbf{X}$ is denoted as $x_{ij}$. $\boldsymbol{e}_k$ is a column vector with all entries being 0 except the $k$-th entry being 1. $\mathbf{E}_{ij}$ is a matrix with all entries  being 0 except the $(i,j)$-th entry being 1. $\mathbf{I}$ is the identity matrix.
+
+For Gibbs sampler, we use a number in bracket to indicate a sample in a specific iteration, (e.g. $\mathbf{Z}^{(t)}$ is the sampled matrix $\mathbf{Z}$ in the $t$-th iteration).
+
+\subsection{Priors and assumptions}
+\begin{itemize}
+  \item We define an Indian buffet process on the prior of $\mathbf{Z}$. The Indian buffet process scheme is introduced by \citet[Sec 2.4]{griffiths2005infinite}. Using $K_1^{(i)}$ to indicate the number of new dishes sampled by the $i$-th customer, the probability of any particular matrix being produce by the IBP is $$P(\mathbf{Z}\mid\alpha) = \frac{\alpha^{K}}{\prod_{i=1}^NK_1^{(i)}!}\exp\{-\alpha H_N\}\prod_{k=1}^K\frac{(N - m_k)!(m_k - 1)!}{N!},$$
+  where $m_k = \sum_{i=1}^N z_{ik}$ is the number of objects possessing feature $k$, and $$H_N = \sum_{n = 1}^N\frac{1}{n}.$$
+  \item The feature matrix has a Gaussian prior $$\mathbf{A}\mid K, \sigma_A\sim \mathcal{MN}(\mathbf{O}_{K\times D}, \mathbf{I}_K, \sigma_A^2\mathbf{I}_D).$$
+  \item Given $\mathbf{Z}$ and $\mathbf{A}$, the distribution of $\mathbf{X}$ is Gaussian $$\mathbf{X}\mid \mathbf{Z}, \mathbf{A}, \sigma_X \sim \mathcal{MN}(\mathbf{ZA}, \mathbf{I}_N, \sigma_X^2\mathbf{I}_D).$$
+  \item The prior distribution of $\alpha$, $\sigma_A$ and $\sigma_X$ are gamma distributions.
+  $$
+  \begin{aligned}
+    \alpha &\sim \mathcal{G}(\alpha^a, \alpha^b);\\
+    \sigma_X &\sim \mathcal{G}(\sigma_X^a,\sigma_X^b);\\
+    \sigma_A &\sim \mathcal{G}(\sigma_A^a, \sigma_A^b).
+  \end{aligned}
+  $$
+  \item If a column of $\mathbf{Z}$ are all $0$'s, this column as well as the corresponding row in $\mathbf{A}$ are removed, as no entries in this column will be assigned $1$ in the Gibbs sampler.
+\end{itemize}
+
+\subsection{Full conditionals}
+  \citet{griffiths2005infinite} noticed that $\mathbf{A}$ can be integrated out, so there is no need to update $\mathbf{A}$ each step.
+  \begin{multline}
+    p(\mathbf{X}\mid \mathbf{Z}, \sigma_X, \sigma_A) = \frac{1}{(2\pi)^{ND/2}\sigma_X^{(N-K)D}\sigma_A^{KD}|{\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}|^{D/2}} \\
+    \exp\left\{-\frac{1}{2\sigma_X^2}\mathrm{tr}({\mathbf{X}}^{\mathrm{T}}(\mathbf{I}-\mathbf{Z}({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I})^{-1}{\mathbf{Z}}^{\mathrm{T}})\mathbf{X})\right\}.
+  \end{multline}
+\begin{itemize}
+  \item Full conditional for $\mathbf{Z}$:
+  
+  As the dimension of $\mathbf{Z}$ may change through the sampling, we need to find the full conditional for both the original and the (potential) additional columns of $\mathbf{Z}$.
+  \begin{itemize}
+    \item For $k = 1, \cdots, K$, $$P(z_{ik}\mid \mathbf{X},\mathbf{Z}_{-(i,k)}, \sigma_X, \sigma_A)\propto p(\mathbf{X}\mid \mathbf{Z}, \sigma_X, \sigma_A)P(z_{ik}\mid \boldsymbol{z}_{-i, k}),$$
+    where $P(z_{ik} = 1\mid\boldsymbol{z}_{-i, k}) = \frac{m_{-i, k}}{N}$.
+
+    $m_{-i,k}$ denotes the number of objects possessing feature $k$, excluding $i$.
+    \item There might be $K_i^\text{new}$ columns added to $\mathbf{Z}$, each additional column being $\boldsymbol{e}_i$.
+    $$P(K_i^\text{new}\mid \mathbf{X},\mathbf{Z},\sigma_X,\sigma_A,\alpha) \propto p(\mathbf{X}\mid \mathbf{Z}_{i,K_i^\text{new}}^{+},\sigma_X,\sigma_A)P(K_i^\text{new}\mid\alpha),$$
+    where $K_i^\text{new}\mid \alpha \sim \mathrm{Possion}(\alpha/N)$, $$\mathbf{Z}_{i,K_i^\text{new}}^+ = \begin{pmatrix}
+      \mathbf{Z}, \smash{\underbrace{\boldsymbol{e}_i, \cdots, \boldsymbol{e}_i}_{K_i^\mathrm{new}\text{ columns}}}
+    \end{pmatrix}.$$
+  \end{itemize}
+  \item Full conditional for $\alpha$:
+  $$\alpha\mid \mathbf{Z}\sim \mathcal{G}(\alpha^a + K, \alpha^b + H_N).$$
+  \item Full conditional for $\sigma_X$ and $\sigma_A$:
+  $$
+  \begin{aligned}
+    p(\sigma_X\mid \mathbf{X}, \mathbf{Z}, \sigma_A) &\propto p(\mathbf{X}\mid \mathbf{Z},\sigma_X, \sigma_A) p(\sigma_X), \\
+    p(\sigma_A\mid \mathbf{X}, \mathbf{Z}, \sigma_X) &\propto p(\mathbf{A}\mid \mathbf{Z},\sigma_X, \sigma_A) p(\sigma_X). \\
+  \end{aligned}
+  $$
+\end{itemize}
+\subsection{Gibbs sampler}
+\begin{algorithm}
+  \caption{Gibbs sampler for linear-Gaussian binary latent feature model}
+  \KwData{An $N\times D$ matrix $\mathbf{X}$}
+  \KwIn{Number of iterations $T$ and hypermeters $\alpha^a$, $\alpha^b$, $\sigma_X^a$, $\sigma_X^b$, $\sigma_A^a$, $\sigma_A^b$}
+  \KwOut{Results of $\mathbf{Z}$, $\alpha$, $\sigma_X$, $\sigma_A$ in each iteration}
+
+  Sample $\alpha^{(0)}\in\mathcal{G}(\alpha^a,\alpha^b)$, $\sigma_X^{(0)}\in\mathcal{G}(\sigma_X^a,\sigma_X^b)$ and $\sigma_A^{(0)}\in\mathcal{G}(\sigma_A^a,\sigma_A^b)$\;
+  Sample $\mathbf{Z}^{(0)}$ from Indian buffet process\;
+  \For{$t = 1$ to $T$}{
+    \For{$i$ in randomized $1:N$}{
+      \For{$k = 1$ to $K$}{
+        Sample $z_{ik}^{(t)} \mid \mathbf{X},\mathbf{Z}^{(t-1)}_{-(i,k)}, \sigma_X^{(t-1)}, \sigma_A^{(t-1)}$\;
+      }
+      Sample $K_i^{\text{new},(t)}\mid \mathbf{X},\mathbf{Z}^{(t)},\sigma_X^{(t-1)},\sigma_A^{(t-1)},\alpha^{(t-1)}$\;
+    }
+    Sample $\alpha^{(t)}\mid \mathbf{Z}^{(t)}$\;
+    Sample $\sigma_X^{(t)}\mid \mathbf{X}, \mathbf{Z}^{(t)}, \sigma_A^{(t-1)}$\;
+    Sample $\sigma_A^{(t)}\mid \mathbf{X}, \mathbf{Z}^{(t)}, \sigma_X^{(t)}$\;
+  }
+\end{algorithm}
+
+\section{Optimization}
+In code optimization and speeding, an important philosophy is given by the Amdahl's law \citep{Amdahl10.1145/1465482.1465560} and the Gustafson's law \citep{10.1145/42411.42415}. Both laws state that the upper bound of theorical speedup on a part of a system depends on the frequency this part is used. In parallel programming, these laws also show how much acceleration can be expected after dispatching the workload onto multiple cores.
+
+Guided by these laws, we prioritized the optimization of code based on the frequency of execution and the maximum possible speedup ratio. We first design algorithms that have lower asymptotic time complexity. Afterwards, we tried optimization based on numba, cython, which is implemented in static programming languages such as C or C++. 
+
+The \texttt{numpy} functions highly rely on various linear algebra libraries such as LAPACK. The complexity of basic matrix operations are prescribed by BLAS. From these standards, the time complexity of some matrix operations are listed in Table \ref{tbl::timecplxnp}.
+
+We may assume that $K \ll N$ (Assumption 1) as we would not expect more features to be extracted than the number of observations. Unless under high-dimensional situations, we might further assume that we always have a relatively large amount of data such that $N > D$ (Assumption 2).
+
+\begin{table}[!h]
+  \centering
+  \small
+  \caption{Time complexity of some \texttt{numpy} matrix operations}
+  \label{tbl::timecplxnp}
+  \begin{tabular}{cccc}
+    \toprule
+    Operation & Input Shape & Output Shape & Estimated Time Complexity \\
+    \midrule
+    Matrix Multiplication & $(m,n)$, $(n,k)$ & $(m, k)$ & $O(mnk)$ \\
+    Matrix Inverse & $(n,n)$ & $(n,n)$ & $O(n^3)$ \\
+    Determinant & $(n,n)$ & $(1)$ & $O(n^3)$ \\
+    Singular Value Decomposition & $(m,n)$ & $(m,n),(n,n),(n,n)$ & $O(mn\min\{m,n\})$ \\
+    Trace & $(n,n)$ & $(1)$ & $O(n)$ \\
+    $L_2$ Norm & $(n)$ & $(1)$ & $O(n)$ \\
+    Frobenius Norm & $(m,n)$ & $(1)$ & $O(mn)$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Optimization on calculating the conditional likelihood}\label{sec::lp}
+The function \texttt{lp} is intended to calculate the conditional likelihood of $\mathbf{X}$ given $\mathbf{Z}, \sigma_X, \sigma_A$. This calculation is called in each draw of $z_{ik}$, $\sigma_X$ and $\sigma_A$. Moreover, it is called multiple times in determining $K_i^\text{new}$. In each iteration, \texttt{lp} is called $N(K + c) + 2$ times, $c$ being a constant which does not vary with $N, K$ or $D$. Here and henceforth, we will use the big-O notation and the number of \texttt{lp} calls is $O(NK)$.
+
+For numerical stability, we calculate the log conditional likelihood instead, which is given by 
+\begin{multline}
+  \log p(\mathbf{X}\mid \mathbf{Z}, \sigma_X, \sigma_A) = -\frac{ND}{2}\log(2\pi)-(N-K)D\log{\sigma_X} - KD\log\sigma_A -\\\frac{D}{2}\log \left|{\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}\right|
+  -\frac{1}{2\sigma_X^2}\mathrm{tr}\left\{{\mathbf{X}}^{\mathrm{T}}\left(\mathbf{I}-\mathbf{Z}\left({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}\right)^{-1}{\mathbf{Z}}^{\mathrm{T}}\right)\mathbf{X}\right\}.
+\end{multline}
+
+Suppose the singular value decomposition of $\mathbf{Z}$ is $$\mathbf{Z} = \mathbf{U}\mathrm{diag}(\boldsymbol{d}){\mathbf{V}}^{\mathrm{T}},$$
+where ${\mathbf{U}}^{\mathrm{T}}\mathbf{U} = \mathbf{I}$, ${\mathbf{V}}^{\mathrm{T}}\mathbf{V} = \mathbf{V}{\mathbf{V}}^{\mathrm{T}} = \mathbf{I}$. Then, $$\left|{\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}\right| = \prod_{i=1}^{\min\{N, K\}}\left( d_i^2 + \frac{\sigma_X^2}{\sigma_A^2} \right),$$
+$$
+\begin{aligned}
+  \mathrm{tr}\left\{{\mathbf{X}}^{\mathrm{T}}\left(\mathbf{I}-\mathbf{Z}\left({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}\right)^{-1}{\mathbf{Z}}^{\mathrm{T}}\right)\mathbf{X}\right\} = \mathrm{tr}({\mathbf{X}}^{\mathrm{T}}\mathbf{X}) - \sum_{i=1}^{\min\{N, K\}}\frac{d_i^2}{d_i^2 + \sigma_X^2/\sigma_A^2}||\boldsymbol{u}_{\cdot i}^\mathrm{T}\mathbf{X}||_2^2.
+\end{aligned}
+$$
+The proof is provided in Appendix \ref{app::proof1}.
+The value of $\mathrm{tr}({\mathbf{X}}^{\mathrm{T}}\mathbf{X})$ can be calculated and stored before the iteration steps, and thus the time on calculating this term is negligible.
+
+\begin{table}[!h]
+  \centering
+  \small
+  \caption{Time complexity comparison of \texttt{lp}}
+  \label{tbl::timecp1}
+  \begin{tabular}{cccc}
+    \toprule
+     & Time Complexity & Under Assumption 1 & Under Assumption 2 \\
+    \midrule
+    Original & $O(N^2D + ND^2 + N^2K + NK^2 + K^3)$ & $O(N^2D + ND^2)$ & $O(N^2D)$ \\
+    Improved & $O(N(K + D)\min\{N, K\})$ & $O(NDK)$ & $O(NDK)$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Optimization on sampling $K_i^{\text{new}}$}\label{sec::K}
+Although we can express the posterior as proportional to the multiplication of likelihood and prior, it is rather difficult to find the normalization term as it involves an infinite sum which does not have a closed form result. In practice, we use a truncated distribution instead; set a large upper bound $C$ for the value of $K_i^\text{new}$ and calculate the posterior probability of each value. The prior, which is a poisson distribution, is easy and fast to calculate. Hence, it is important to speed up finding the likelihood.
+
+Definitely, we can use the improved version in Section \ref{sec::lp}. However, we may note that the matrices $\mathbf{Z}$ passed into \texttt{lp} are related, in the sense that for each increment of $K_i^\text{new}$, $\mathbf{Z}$ is appended by a column $\boldsymbol{e}_i$ on the right.
+
+Let $\widetilde{\mathbf{Z}} = \begin{bmatrix}
+  \mathbf{Z} & \boldsymbol{e}_i
+\end{bmatrix}$, $\mathbf{W} = {\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}$, $\mathbf{\Gamma} = \mathbf{Z}({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}){\mathbf{Z}}^{\mathrm{T}}$, $t = \mathrm{tr}\{{\mathbf{X}}^{\mathrm{T}}(\mathbf{I}-\mathbf{Z}({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I})^{-1}{\mathbf{Z}}^{\mathrm{T}})\mathbf{X}\}$, and define $\widetilde{\mathbf{W}}$, $\widetilde{\mathbf{\Gamma}}$, $\widetilde{t}$ similarly. For simplicity of notation, we define $\mu = 1 + \frac{\sigma_X^2}{\sigma_A^2} - \gamma_{ii}$. It can be shown (see Appendix \ref{app::proof2}) that $$|\widetilde{\mathbf{W}}| = \mu|\mathbf{W}|,~\widetilde{\boldsymbol{\gamma}}_{\cdot i} = \boldsymbol{\gamma}_{\cdot i} + \mu^{-1}(\gamma_{ii} - 1)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i),$$
+and
+$$\widetilde{t} = t - \mu^{-1}||\mathbf{X}^\mathrm{T}\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{x}_{i\cdot}||_2^2.$$
+
+\begin{table}[!h]
+  \centering
+  \small
+  \caption{Time complexity comparison of sampling $K_i^\text{new}$}
+  \label{tbl::timecp2}
+  \begin{tabular}{cccc}
+    \toprule
+     & Time Complexity & Under Assumption 1 & Under Assumption 2 \\
+    \midrule
+    Original & {\scriptsize$O(CN^2D + CND^2 + CN^2K + CNK^2 + CK^3)$} & $O(CN^2D + CND^2)$ & $O(CN^2D)$ \\
+    Improved \texttt{lp} & $O(CN(K + D)\min\{N, K\})$ & $O(CNDK)$ & $O(CNDK)$ \\
+    Recursive & $O(NK\min\{N, K\} + CND)$ & $O(NK^2 + CND)$ & $O(NK^2 + CND)$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Execution time comparison}
+
+We tested the accuracy of both optimizations, and recorded the respective execution time. The discrepancy between optimized version and the original version is at the scale of $10^{-15}$, which is quite satisfactory. The results on running time are shown as in Table \ref{tbl::realtime1} and Table \ref{tbl::realtime2}.
+
+\begin{table}[!h]
+  \centering
+  \small
+  \caption{Real execution time comparison of Section \ref{sec::lp}}
+  \label{tbl::realtime1}
+  \begin{tabular}{cccrrrrr}
+    \toprule
+      \multirow{2}{*}{$N$} & \multirow{2}{*}{$D$} & \multirow{2}{*}{$K$} & \multicolumn{2}{c}{Old time (s)} & \multicolumn{2}{c}{New time (s)} & \multirow{2}{*}{Avg. Speed up} \\ \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+      & & & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} \\
+    \midrule
+    \multirow{4}{*}{200} & \multirow{2}{*}{40} & 10 & 0.000307 & 0.001350 & 0.000222 & 0.002648 &
+    \\
+    & & 20 & 0.000386 & 0.003899 & 0.000254 & 0.004414 &
+    \\
+    & \multirow{2}{*}{80} & 20 & 0.000378 & 0.001547 & 0.000227 & 0.001635 & 
+    \\
+    & & 40 & 0.000642 & 0.003046 & 0.000341 & 0.001650 &
+    \\
+    \multirow{4}{*}{1000} & \multirow{2}{*}{200} & 50 & 0.008888 & 0.024496 & 0.001331 & 0.009833 &
+    \\
+    & & 100 & 0.018554 & 0.029955 & 0.002945 & 0.007445 &
+    \\
+    & \multirow{2}{*}{400} & 100 & 0.022805 & 0.037314 & 0.003169 & 0.005084 & 
+    \\
+    & & 200 & 0.057706 & 0.069650 & 0.007470 & 0.011485 &
+    \\
+    \multirow{4}{*}{5000} & \multirow{2}{*}{1000} & 250 & 1.409483 & 1.515692 & 0.051928 & 0.074056 &
+    \\
+    & & 500 & 5.540976 & 6.007763 & 0.138402 & 0.210703 &
+    \\
+    & \multirow{2}{*}{2000} & 500 & 6.044738 & 6.234605 & 0.158751 & 0.195732 & 
+    \\
+    & & 1000 & 29.506844 & 29.719376 & 0.472647 & 0.633464 &
+    \\
+    \multirow{4}{*}{10000} & \multirow{2}{*}{2000} & 500 & 13.144238 & 13.335559 & 0.313577 & 0.378531 &
+    \\
+    & & 1000 & 61.384636 & 61.649799 & 0.904890 & 1.051028 &
+    \\
+    & \multirow{2}{*}{4000} & 1000 & 64.492656 & 64.732630 & 1.325637 & 1.542795 & 
+    \\
+    & & 2000 & \multicolumn{1}{c}{~~~------$~^*$} & \multicolumn{1}{c}{~~~------$~^*$} & 4.822996 & 5.329228 &
+    \\
+    \bottomrule
+    \multicolumn{7}{l}{$^*$ Unable to calculate $100$ times within $24$ hours.}
+  \end{tabular}
+\end{table}
+
+\begin{table}[!h]
+  \centering
+  \small
+  \caption{Real execution time comparison of Section \ref{sec::K}}
+  \label{tbl::realtime2}
+  \begin{tabular}{cccrrrrr}
+    \toprule
+      \multirow{2}{*}{$N$} & \multirow{2}{*}{$D$} & \multirow{2}{*}{$K$} & \multicolumn{2}{c}{Old time (s)} & \multicolumn{2}{c}{New time (s)} & \multirow{2}{*}{Avg. Speed up} \\ \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+      & & & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} \\
+    \midrule
+    \multirow{4}{*}{200} & \multirow{2}{*}{40} & 10 & 0.000307 & 0.001350 & 0.000222 & 0.002648 &
+    \\
+    & & 20 & 0.000386 & 0.003899 & 0.000254 & 0.004414 &
+    \\
+    & \multirow{2}{*}{80} & 20 & 0.000378 & 0.001547 & 0.000227 & 0.001635 & 
+    \\
+    & & 40 & 0.000642 & 0.003046 & 0.000341 & 0.001650 &
+    \\
+    \multirow{4}{*}{1000} & \multirow{2}{*}{200} & 50 & 0.008888 & 0.024496 & 0.001331 & 0.009833 &
+    \\
+    & & 100 & 0.018554 & 0.029955 & 0.002945 & 0.007445 &
+    \\
+    & \multirow{2}{*}{400} & 100 & 0.022805 & 0.037314 & 0.003169 & 0.005084 & 
+    \\
+    & & 200 & 0.057706 & 0.069650 & 0.007470 & 0.011485 &
+    \\
+    \multirow{4}{*}{5000} & \multirow{2}{*}{1000} & 250 & 1.409483 & 1.515692 & 0.051928 & 0.074056 &
+    \\
+    & & 500 & 5.540976 & 6.007763 & 0.138402 & 0.210703 &
+    \\
+    & \multirow{2}{*}{2000} & 500 & 6.044738 & 6.234605 & 0.158751 & 0.195732 & 
+    \\
+    & & 1000 & 29.506844 & 29.719376 & 0.472647 & 0.633464 &
+    \\
+    \multirow{4}{*}{10000} & \multirow{2}{*}{2000} & 500 & 13.144238 & 13.335559 & 0.313577 & 0.378531 &
+    \\
+    & & 1000 & 61.384636 & 61.649799 & 0.904890 & 1.051028 &
+    \\
+    & \multirow{2}{*}{4000} & 1000 & 64.492656 & 64.732630 & 1.325637 & 1.542795 & 
+    \\
+    & & 2000 &  &  &  &  &
+    \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Simulation}
+
+\section{Applications}
+
+\section{Comparative Analysis}
+
+\section{Discussion}
+
+\bibliographystyle{plainnat}
+\bibliography{ref}
+
+\newpage
+\begin{appendices}
+  \section{Proof on accuracy of optimizations}
+  \subsection{On calculating the conditional likelihood}\label{app::proof1}
+    Some contents
+  \subsection{On sampling $K_i^\text{new}$}\label{app::proof2}
+    Some contents
+\end{appendices}
+
+\end{document}
