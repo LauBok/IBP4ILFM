@@ -1,5 +1,5 @@
 import numpy as np
-from tqdm import tqdm
+from tqdm import tqdm,trange
 import random
 import sys
 
@@ -61,13 +61,16 @@ class IBP:
             'sigma_A': np.zeros(maxiter),
             'alpha': np.zeros(maxiter)
         }
-        for it in tqdm(range(maxiter), file = sys.stdout):
-            self.step()
-            history['Z'][it] = self.Z * 1
-            history['K'][it] = self.K
-            history['sigma_X'][it] = self.sigma_X
-            history['sigma_A'][it] = self.sigma_A
-            history['alpha'][it] = self.alpha
+        with tqdm(total=maxiter) as pbar:
+            for it in range(maxiter):
+                self.step()
+                history['Z'][it] = self.Z * 1
+                history['K'][it] = self.K
+                history['sigma_X'][it] = self.sigma_X
+                history['sigma_A'][it] = self.sigma_A
+                history['alpha'][it] = self.alpha
+                pbar.set_description("Current K = %s" % self.K)
+                pbar.update(1)
         return history
     
     def step(self):
@@ -81,7 +84,7 @@ class IBP:
         if self.sigma_A_update:
             self.sampleSigmaA()
 
-    def lp_original(self, Z = None, sigma_X = None, sigma_A = None):
+    def _lp_original(self, Z = None, sigma_X = None, sigma_A = None):
         if Z is None:
             Z = self.Z
         if sigma_X is None:
@@ -105,7 +108,6 @@ class IBP:
         if sigma_A is None:
             sigma_A = self.sigma_A
         K = Z.shape[1]
-        
         u, s, _ = np.linalg.svd(Z,full_matrices=False)
         det = np.sum(np.log(s**2 + sigma_X**2 / sigma_A**2))
         l = s**2 / (s**2 + sigma_X**2 / sigma_A**2)
@@ -113,7 +115,7 @@ class IBP:
         uX = np.sum(uTX ** 2, axis = 1)
 
         res = - self.N * self.D / 2 * np.log(2 * np.pi)
-        res -= (self.N - self.K) * self.D * np.log(sigma_X)
+        res -= (self.N - K) * self.D * np.log(sigma_X)
         res -= K * self.D * np.log(sigma_A)
         res -= self.D / 2 * det
         res -= 1 / (2 * sigma_X**2) * (self.trX - sum(l * uX))
@@ -155,7 +157,7 @@ class IBP:
             cur_diff += t / (2 * self.sigma_X**2)
             cur_diff += np.log(lmd) - np.log(cnt)
             gamma_i += 1/mu * (gamma_i[i] - 1) * (gamma_i - e)
-            log_prob.append(cur_diff)
+            log_prob = np.append(log_prob, cur_diff)
         
         # avoid overflow/underflow error
         log_prob -= np.max(log_prob)
@@ -168,13 +170,12 @@ class IBP:
         self.Z = IBP.append(self.Z[:, m != 0], i, K_post)
         self.K = self.Z.shape[1]
         
-    def sampleK_original(self, i, log_thres = -16):
+    def _sampleK_original(self, i, log_thres = -16):
         log_prob = np.array([])
         K_new = 0
         lmd = self.alpha / self.N
         log_fac = lambda n: 0 if n == 0 else np.log(n) + log_fac(n - 1)
         log_pois = lambda K: K * np.log(lmd) - lmd - log_fac(K)
-       
         while log_pois(K_new) > log_thres:
             log_prob = np.append(log_prob, log_pois(K_new) + self.lp(IBP.append(self.Z, i, K_new)))
             K_new += 1
@@ -215,8 +216,16 @@ class IBP:
     @staticmethod
     def binary(p, type = None):
         if type == 'log':
+            if p > 0:
+                return 1
+            elif p < -200:
+                return 0
             p = np.exp(p)
         elif type == 'logdiff':
+            if p > 200:
+                return 1
+            elif p < -200:
+                return 0
             p = np.exp(p) / (1 + np.exp(p))
         return np.random.random() < p
     

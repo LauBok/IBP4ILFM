@@ -45,7 +45,7 @@ V5 = np.array([
 ])
 V = [V1, V2, V3, V4, V5]
 
-N = 200
+N = 500
 D1 = 0.6 * np.outer(np.random.binomial(1, 0.5, N), V1)
 D2 = 0.6 * np.outer(np.random.binomial(1, 0.5, N), V2)
 D3 = 0.6 * np.outer(np.random.binomial(1, 0.5, N), V3)
@@ -56,7 +56,7 @@ X += np.random.normal(0, 0.1, X.shape)
 print(X.shape)
 
 ibp = IBP(X, alpha = (1,1), sigma_X = (1,1), sigma_A = (1,1))
-history = ibp.MCMC(500)
+history = ibp.MCMC(100)
 print("K", history["K"])
 print("alpha", history["alpha"])
 print("sigma_X", history["sigma_X"])
