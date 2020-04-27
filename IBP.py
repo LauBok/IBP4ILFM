@@ -11,22 +11,19 @@ class IBP:
         self.sigma_A = sigma_A
         self.trX = np.trace(self.X.T @ self.X)
         if type(alpha) is tuple:
-            self.alpha_a, self.alpha_b = alpha
-            self.alpha = np.random.gamma(*alpha)
+            self.alpha, self.alpha_a, self.alpha_b = alpha
             self.alpha_update = True
         else:
             self.alpha = alpha
             self.alpha_update = False
         if type(sigma_X) is tuple:
-            self.sigma_X_a, self.sigma_X_b = sigma_X
-            self.sigma_X = np.random.gamma(*sigma_X)
+            self.sigma_X, self.sigma_X_a, self.sigma_X_b = sigma_X
             self.sigma_X_update = True
         else:
             self.sigma_X = sigma_X
             self.sigma_X_update = False
         if type(sigma_A) is tuple:
-            self.sigma_A_a, self.sigma_A_b = sigma_A
-            self.sigma_A = np.random.gamma(*sigma_A)
+            self.sigma_A, self.sigma_A_a, self.sigma_A_b = sigma_A
             self.sigma_A_update = True
         else:
             self.sigma_A = sigma_A
@@ -194,7 +191,7 @@ class IBP:
     def sampleAlpha(self):
         self.alpha = np.random.gamma(self.alpha_a + self.K, self.alpha_b + np.sum(1/np.arange(1, self.N + 1)))
 
-    def sampleSigmaX(self, epsilon = 0.1):
+    def sampleSigmaX(self, epsilon = 0.01):
         new_sigma_X = IBP.wallRandomWalk(self.sigma_X, epsilon, wall = (0, None))
         log_p = (self.sigma_X_a - 1) * (np.log(new_sigma_X) - np.log(self.sigma_X))
         log_p -= self.sigma_X_b * (new_sigma_X - self.sigma_X)
@@ -202,7 +199,7 @@ class IBP:
         if IBP.binary(min(0,log_p), type = 'log'):
             self.sigma_X = new_sigma_X
     
-    def sampleSigmaA(self, epsilon = 0.1):
+    def sampleSigmaA(self, epsilon = 0.01):
         new_sigma_A = IBP.wallRandomWalk(self.sigma_A, epsilon, wall = (0, None))
         log_p = (self.sigma_A_a - 1) * (np.log(new_sigma_A) - np.log(self.sigma_A))
         log_p -= self.sigma_A_b * (new_sigma_A - self.sigma_A)

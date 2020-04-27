@@ -89,7 +89,7 @@
 
 \section{Background}
 
-Clustering is a set of methods that have been extensively studied and used in unsupervised learning since its first appearance in 1954 \citep{caron2018deep}. A large number of these methods assume that each observation belongs to one of some mutually exclusive clusters and attempt to classify the observations, although the classification can be deterministic (e.g. K means \citep{steinhaus1956division, lloyd1982least}) of probabilistic (e.g. Latent Dirichlet Allocation \citep{blei2003latent}). However, many datasets do not intrinsically satisfy the assumption. Instead, they share multiple latent features and each observation contains a subset of these features. An example is in image detection where the aim is to identify and position items in images \citep{zhang2018multilabel}. Multi-labeled data are also common in recommendation system, where each item is related to multiple tags \citep{zheng2014context}.
+Clustering is a set of methods that have been extensively studied and used in unsupervised learning since its first appearance in 1954 \citep{caron2018deep}. A large number of these methods assume that each observation belongs to one of some mutually exclusive clusters and attempt to classify the observations, although the classification can be deterministic (e.g. K means \citep{steinhaus1956division, lloyd1982least}) or probabilistic (e.g. Latent Dirichlet Allocation \citep{blei2003latent}). However, many datasets do not intrinsically satisfy the assumption. Instead, they share multiple latent features and each observation contains a subset of these features. An example is in image detection where the aim is to identify and position items in images \citep{zhang2018multilabel}. Multi-labeled data are also common in recommendation system, where each item is related to multiple tags \citep{zheng2014context}.
 
 All of these methods confront the critical challenge to determine how many latent features are necessary to model the hidden structure beyond the data. Usually, models with various number of latent features are tested and the optimal dimensionality is chosen based upon some metric on complexity or generalizaion error. In a Bayesian context, the dimensionality is controlled by both the prior belief and the data. Under this setting, the number of latent features can be infinite, and the data only reveal a finite subset of these features \citep{rasmussen2001occam}, such as Dirichlet process mixture models \citep{antoniak1974mixtures}. In a Dirichlet process mixture model, each object belongs to one of the latent classes, and each latent class defines a distribution over all latent features. The prior distribution of each class, which is a Dirichlet Process, is discrete with probability 1, but takes non-zero probability at infinite values \citep{teh2010dirichlet}, assuring Dirichlet process mixture models to have infinite underlying features \citep{rasmussen2000infinite}. Beta process can be the prior distribution on the probability of each latent feature if each observation has multiple features \citep{JMLR:v12:griffiths11a}. Similarly, such models also have infinite dimensionality in the latent features.
 
@@ -177,7 +177,7 @@ For Gibbs sampler, we use a number in bracket to indicate a sample in a specific
     Sample $\alpha^{(t)}\mid \mathbf{Z}^{(t)}$\;
     Sample $\sigma_X^{(t)}\mid \mathbf{X}, \mathbf{Z}^{(t)}, \sigma_A^{(t-1)}$\;
     Sample $\sigma_A^{(t)}\mid \mathbf{X}, \mathbf{Z}^{(t)}, \sigma_X^{(t)}$\;
-  }
+  } 
 \end{algorithm}
 
 \section{Optimization}
@@ -272,7 +272,7 @@ $$\widetilde{t} = t - \mu^{-1}||\mathbf{X}^\mathrm{T}\boldsymbol{\gamma}_{\cdot 
 
 \subsection{Execution time comparison}
 
-We tested the accuracy of both optimizations, and recorded the respective execution time. The discrepancy between optimized version and the original version is at the scale of $10^{-15}$, which is quite satisfactory. The results on running time are shown as in Table \ref{tbl::realtime1} and Table \ref{tbl::realtime2}.
+We tested the accuracy of both optimizations, and recorded the respective execution time. The discrepancy between optimized version and the original version is at the scale of $10^{-15}$, which is quite satisfactory. The results on running time are shown as in Table \ref{tbl::realtime1} and Table \ref{tbl::realtime2}. The calculation of log conditional likelihood is required in updating each element of $\mathbf{Z}$ and the Metropolis steps for $\sigma_X$ and $\sigma_A$. Therefore, the efficiency brought by optimizing \texttt{lp} is significant. In the process of sampling new features, our proposed recursive algorithm outperforms the original algorithm even with \texttt{lp} optimized. Compared to the vanilla implementation, this procedure leads to tremendous efficiency promotion.
 
 \begin{table}[!h]
   \centering
@@ -281,43 +281,44 @@ We tested the accuracy of both optimizations, and recorded the respective execut
   \label{tbl::realtime1}
   \begin{tabular}{cccrrrrr}
     \toprule
-      \multirow{2}{*}{$N$} & \multirow{2}{*}{$D$} & \multirow{2}{*}{$K$} & \multicolumn{2}{c}{Old time (s)} & \multicolumn{2}{c}{New time (s)} & \multirow{2}{*}{Avg. Speed up} \\ \cmidrule(lr){4-5} \cmidrule(lr){6-7}
-      & & & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} \\
+      \multirow{2}{*}{$N$} & \multirow{2}{*}{$D$} & \multirow{2}{*}{$K$} & \multicolumn{2}{c}{Old time (s)} & \multicolumn{2}{c}{New time (s)} & \multicolumn{1}{c}{Avg.} \\ \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+      & & & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} & \multicolumn{1}{c}{Speedup} \\
     \midrule
-    \multirow{4}{*}{200} & \multirow{2}{*}{40} & 10 & 0.000307 & 0.001350 & 0.000222 & 0.002648 &
+    \multirow{4}{*}{200} & \multirow{2}{*}{40} & 10 & 0.000307 & 0.001350 & 0.000222 & 0.002648 & 1.383
     \\
-    & & 20 & 0.000386 & 0.003899 & 0.000254 & 0.004414 &
+    & & 20 & 0.000386 & 0.003899 & 0.000254 & 0.004414 & 1.520
     \\
-    & \multirow{2}{*}{80} & 20 & 0.000378 & 0.001547 & 0.000227 & 0.001635 & 
+    & \multirow{2}{*}{80} & 20 & 0.000378 & 0.001547 & 0.000227 & 0.001635 & 1.665
     \\
-    & & 40 & 0.000642 & 0.003046 & 0.000341 & 0.001650 &
+    & & 40 & 0.000642 & 0.003046 & 0.000341 & 0.001650 & 1.883
     \\
-    \multirow{4}{*}{1000} & \multirow{2}{*}{200} & 50 & 0.008888 & 0.024496 & 0.001331 & 0.009833 &
+    \multirow{4}{*}{1000} & \multirow{2}{*}{200} & 50 & 0.008888 & 0.024496 & 0.001331 & 0.009833 & 6.678
     \\
-    & & 100 & 0.018554 & 0.029955 & 0.002945 & 0.007445 &
+    & & 100 & 0.018554 & 0.029955 & 0.002945 & 0.007445 & 6.300
     \\
-    & \multirow{2}{*}{400} & 100 & 0.022805 & 0.037314 & 0.003169 & 0.005084 & 
+    & \multirow{2}{*}{400} & 100 & 0.022805 & 0.037314 & 0.003169 & 0.005084 & 7.196
     \\
-    & & 200 & 0.057706 & 0.069650 & 0.007470 & 0.011485 &
+    & & 200 & 0.057706 & 0.069650 & 0.007470 & 0.011485 & 7.725
     \\
-    \multirow{4}{*}{5000} & \multirow{2}{*}{1000} & 250 & 1.409483 & 1.515692 & 0.051928 & 0.074056 &
+    \multirow{4}{*}{5000} & \multirow{2}{*}{1000} & 250 & 1.409483 & 1.515692 & 0.051928 & 0.074056 & 27.143
     \\
-    & & 500 & 5.540976 & 6.007763 & 0.138402 & 0.210703 &
+    & & 500 & 5.540976 & 6.007763 & 0.138402 & 0.210703 & 40.035
     \\
-    & \multirow{2}{*}{2000} & 500 & 6.044738 & 6.234605 & 0.158751 & 0.195732 & 
+    & \multirow{2}{*}{2000} & 500 & 6.044738 & 6.234605 & 0.158751 & 0.195732 & 38.077
     \\
-    & & 1000 & 29.506844 & 29.719376 & 0.472647 & 0.633464 &
+    & & 1000 & 29.506844 & 29.719376 & 0.472647 & 0.633464 & 62.429
     \\
-    \multirow{4}{*}{10000} & \multirow{2}{*}{2000} & 500 & 13.144238 & 13.335559 & 0.313577 & 0.378531 &
+    \multirow{4}{*}{10000} & \multirow{2}{*}{2000} & 500 & 13.144238 & 13.335559 & 0.313577 & 0.378531 & 41.917
     \\
-    & & 1000 & 61.384636 & 61.649799 & 0.904890 & 1.051028 &
+    & & 1000 & 61.384636 & 61.649799 & 0.904890 & 1.051028 & 67.837
     \\
-    & \multirow{2}{*}{4000} & 1000 & 64.492656 & 64.732630 & 1.325637 & 1.542795 & 
+    & \multirow{2}{*}{4000} & 1000 & 64.492656 & 64.732630 & 1.325637 & 1.542795 & 48.650
     \\
-    & & 2000 & \multicolumn{1}{c}{~~~------$~^*$} & \multicolumn{1}{c}{~~~------$~^*$} & 4.822996 & 5.329228 &
+    & & 2000 & \multicolumn{1}{c}{~~~------$~^*$} & \multicolumn{1}{c}{~~~------$~^*$} & 4.822996 & 5.329228 & \multicolumn{1}{c}{------}
     \\
     \bottomrule
-    \multicolumn{7}{l}{$^*$ Unable to calculate $100$ times within $24$ hours.}
+    \multicolumn{7}{l}{All combinations of hyperparameters are tested for $100$ repetitions.}\\
+    \multicolumn{7}{l}{$^*$ Unable to calculate $100$ repetitions within $24$ hours.}\\
   \end{tabular}
 \end{table}
 
@@ -328,44 +329,51 @@ We tested the accuracy of both optimizations, and recorded the respective execut
   \label{tbl::realtime2}
   \begin{tabular}{cccrrrrr}
     \toprule
-      \multirow{2}{*}{$N$} & \multirow{2}{*}{$D$} & \multirow{2}{*}{$K$} & \multicolumn{2}{c}{Old time (s)} & \multicolumn{2}{c}{New time (s)} & \multirow{2}{*}{Avg. Speed up} \\ \cmidrule(lr){4-5} \cmidrule(lr){6-7}
-      & & & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} \\
+      \multirow{2}{*}{$N$} & \multirow{2}{*}{$D$} & \multirow{2}{*}{$K$} & \multicolumn{2}{c}{Old time (s)} & \multicolumn{2}{c}{New time (s)} & \multicolumn{1}{c}{Avg.} \\ \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+      & & & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{Max.} & \multicolumn{1}{c}{Speedup} \\
     \midrule
-    \multirow{4}{*}{200} & \multirow{2}{*}{40} & 10 & 0.000307 & 0.001350 & 0.000222 & 0.002648 &
+    \multirow{4}{*}{200} & \multirow{2}{*}{40} & 10 & 0.002723 & 0.010516 & 0.000570 & 0.001259 & 4.777
     \\
-    & & 20 & 0.000386 & 0.003899 & 0.000254 & 0.004414 &
+    & & 20 & 0.003887 & 0.007241 & 0.000530 & 0.001176 & 7.334
     \\
-    & \multirow{2}{*}{80} & 20 & 0.000378 & 0.001547 & 0.000227 & 0.001635 & 
+    & \multirow{2}{*}{80} & 20 & 0.003093 & 0.005747 & 0.000542 & 0.001441 & 5.707
     \\
-    & & 40 & 0.000642 & 0.003046 & 0.000341 & 0.001650 &
+    & & 40 & 0.004878 & 0.010489 & 0.000796 & 0.001394 & 6.128
     \\
-    \multirow{4}{*}{1000} & \multirow{2}{*}{200} & 50 & 0.008888 & 0.024496 & 0.001331 & 0.009833 &
+    \multirow{4}{*}{1000} & \multirow{2}{*}{200} & 50 & 0.013081 & 0.023041 & 0.001723 & 0.003313 & 7.592
     \\
-    & & 100 & 0.018554 & 0.029955 & 0.002945 & 0.007445 &
+    & & 100 & 0.035016 & 0.056258 & 0.005390 & 0.010518 & 6.496
     \\
-    & \multirow{2}{*}{400} & 100 & 0.022805 & 0.037314 & 0.003169 & 0.005084 & 
+    & \multirow{2}{*}{400} & 100 & 0.033598 & 0.054375 & 0.004077 & 0.005322 & 8.241
     \\
-    & & 200 & 0.057706 & 0.069650 & 0.007470 & 0.011485 &
+    & & 200 & 0.078245 & 0.094424 & 0.010370 & 0.011971 & 7.545
     \\
-    \multirow{4}{*}{5000} & \multirow{2}{*}{1000} & 250 & 1.409483 & 1.515692 & 0.051928 & 0.074056 &
+    \multirow{4}{*}{5000} & \multirow{2}{*}{1000} & 250 & 0.426222 & 0.501770 & 0.047695 & 0.055292 & 8.936
     \\
-    & & 500 & 5.540976 & 6.007763 & 0.138402 & 0.210703 &
+    & & 500 & 1.155086 & 1.319234 & 0.146501 & 0.164900 & 7.884
     \\
-    & \multirow{2}{*}{2000} & 500 & 6.044738 & 6.234605 & 0.158751 & 0.195732 & 
+    & \multirow{2}{*}{2000} & 500 & 1.657428 & 1.967195 & 0.179803 & 0.228871 & 9.203
     \\
-    & & 1000 & 29.506844 & 29.719376 & 0.472647 & 0.633464 &
+    & & 1000 & 4.538577 & 6.106669 & 0.554646 & 0.653897 & 8.183
     \\
-    \multirow{4}{*}{10000} & \multirow{2}{*}{2000} & 500 & 13.144238 & 13.335559 & 0.313577 & 0.378531 &
+    \multirow{4}{*}{10000} & \multirow{2}{*}{2000} & 500 & 3.214276 & 3.844124 & 0.320323 & 0.426812 & 10.034
     \\
-    & & 1000 & 61.384636 & 61.649799 & 0.904890 & 1.051028 &
+    & & 1000 & 7.758868 & 8.501177 & 0.980188 & 1.212802 & 7.916
     \\
-    & \multirow{2}{*}{4000} & 1000 & 64.492656 & 64.732630 & 1.325637 & 1.542795 & 
+    & \multirow{2}{*}{4000} & 1000 & 10.173895 & 11.740906 & 1.022655 & 1.247130 & 9.949
     \\
-    & & 2000 &  &  &  &  &
+    & & 2000 & 37.213665 & 42.941216 & 4.901111 & 5.721428 & 7.593 
     \\
     \bottomrule
+    \multicolumn{8}{l}{All combinations of hyperparameters are tested for $10$ repetitions, with $C = 5$.} \\
+    \multicolumn{8}{l}{The optimized version of \texttt{lp} is called in the original version of sampling $K_i^\text{new}$ to exclude} \\
+    \multicolumn{8}{l}{the speedup achieved from \texttt{lp}.}
   \end{tabular}
 \end{table}
+
+\subsection{Optimization through parallelism}
+
+\subsection{Optimization using C++}
 
 \section{Simulation}
 
@@ -380,11 +388,105 @@ We tested the accuracy of both optimizations, and recorded the respective execut
 
 \newpage
 \begin{appendices}
-  \section{Proof on accuracy of optimizations}
-  \subsection{On calculating the conditional likelihood}\label{app::proof1}
-    Some contents
-  \subsection{On sampling $K_i^\text{new}$}\label{app::proof2}
-    Some contents
+  \section{Auxillary proofs}
+  \subsection{Proof of calculating the conditional likelihood}\label{app::proof1}
+    Assume $\mathbf{Z}$ is an $M\times K$ matrix and $M\gg K$. Denote $\lambda = \sigma_X^2 / \sigma_A^2$.
+    Let $\mathbf{Z} = \mathbf{U}\mathbf{D}\mathbf{V}^\mathrm{T}$ be the singular value decomposition of $\mathbf{Z}$, where $\mathbf{D} = \mathrm{diag}\{d_1,\cdots, d_K\}$. 
+
+    $$
+    \begin{aligned}
+      \mathbf{Z}^\mathrm{T}\mathbf{Z} + \lambda \mathbf{I} &= \mathbf{V}\mathbf{D}^2 \mathbf{V}^\mathrm{T} + \lambda \mathbf{I} \\
+      &= \mathbf{V} (\mathbf{D}^2 + \lambda \mathbf{I}) \mathbf{V}^\mathrm{T}.
+    \end{aligned}
+    $$
+    Therefore, $|{\mathbf{Z}}^{\mathrm{T}}\mathbf{Z} + \lambda \mathbf{I}| = |\mathbf{D}^2 + \lambda \mathbf{I}| = \prod_{k=1}^K (d_k^2 + \lambda)$, and
+    $$
+    \begin{aligned}
+      \mathrm{tr}\left( \mathbf{X}^\mathrm{T} \left(\mathbf{I} -  \mathbf{Z} \left(\mathbf{Z}^\mathrm{T}\mathbf{Z} + \lambda \mathbf{I} \right)^{-1} \mathbf{Z}^\mathrm{T} \right) \mathbf{X} \right) &= \mathrm{tr}\left( {\mathbf{X}}^{\mathrm{T}} \mathbf{X}\right) - \mathrm{tr}\left( \mathbf{X}^\mathrm{T}\mathbf{U}\mathbf{\Lambda}\mathbf{U}^\mathrm{T}\mathbf{X} \right),
+    \end{aligned}
+    $$
+    where $\mathbf{\Lambda} = \mathrm{diag}\{d_k^2/(d_k^2 + \lambda), k = 1,\cdots, K\}$. 
+    The second term can be efficiently calculated. $$
+    \begin{aligned}
+      \mathrm{tr}(\mathbf{X}^\mathrm{T}\mathbf{U}\mathbf{\Lambda}\mathbf{U}^\mathrm{T}\mathbf{X}) &= \mathrm{tr}\left(\sum_{k = 1}^K \frac{d_k^2}{d_k^2 + \lambda}{\mathbf{X}}^{\mathrm{T}}\boldsymbol{u}_{\cdot k}\boldsymbol{u}_{\cdot k}^\mathrm{T}\mathbf{X}\right) \\
+      &= \sum_{k=1}^K \frac{d_k^2}{d_k^2 + \lambda}\boldsymbol{u}_{\cdot k}^\mathrm{T}\mathbf{X}{\mathbf{X}}^{\mathrm{T}}\boldsymbol{u}_{\cdot k}\\ 
+      &= \sum_{k=1}^K \frac{d_k^2}{d_k^2 + \lambda}||{\mathbf{X}}^{\mathrm{T}}\boldsymbol{u}_{\cdot k}||_2^2.
+    \end{aligned}
+    $$
+  \subsection{Proof of sampling $K_i^\text{new}$}\label{app::proof2}
+    $$
+    \begin{aligned}
+      \widetilde{\mathbf{W}} = {\widetilde{\mathbf{Z}}}^{\mathrm{T}}\widetilde{\mathbf{Z}} + \lambda \mathbf{I} &= \begin{bmatrix}
+        {\mathbf{Z}}^{\mathrm{T}} \\ {\boldsymbol{e}}_i^{\mathrm{T}}
+      \end{bmatrix} \begin{bmatrix}
+        \mathbf{Z} & \boldsymbol{e}_i
+      \end{bmatrix} = 
+      \begin{bmatrix}
+        \mathbf{W} & \boldsymbol{z}_{i \cdot} \\
+        {\boldsymbol{z}}_{\cdot i}^{\mathrm{T}} & 1 + \lambda
+      \end{bmatrix}.
+    \end{aligned}
+    $$
+    By elementary transform of block matrix, 
+    \begin{equation}
+      \begin{bmatrix}
+      \mathbf{I} & \boldsymbol{0} \\ -{\boldsymbol{z}}_{\cdot i}^{\mathrm{T}} \mathbf{W}^{-1} & 1
+    \end{bmatrix}\widetilde{\mathbf{W}}
+    \begin{bmatrix}
+      \mathbf{I} & -\mathbf{W}^{-1}{\boldsymbol{z}}_{\cdot i}  \\ \boldsymbol{0}^\mathrm{T} & 1
+    \end{bmatrix} = \begin{bmatrix}
+      \mathbf{W} & \boldsymbol{0} \\ {\boldsymbol{0}}^{\mathrm{T}} & 1 + \lambda - {\boldsymbol{z}}_{\cdot i}^{\mathrm{T}} \mathbf{W}^{-1}{\boldsymbol{z}}_{\cdot i}
+    \end{bmatrix}.
+    \label{eqn::elemblocktrans}
+    \end{equation}
+    Note that ${\boldsymbol{z}}_{\cdot i}^{\mathrm{T}} \mathbf{W}^{-1}{\boldsymbol{z}}_{\cdot i} = \gamma_{ii}$, and let $\mu = 1 + \lambda - \gamma_{ii}$, we have
+    $$\log |\widetilde{\mathbf{W}}| - \log|\mathbf{W}| = \log \mu.$$
+    It can be shown as well from (\ref{eqn::elemblocktrans}) that 
+    $$\begin{aligned}
+      \widetilde{\mathbf{W}}^{-1} &= \begin{bmatrix}
+      \mathbf{I} & -\mathbf{W}^{-1}{\boldsymbol{z}}_{\cdot i}  \\ \boldsymbol{0}^\mathrm{T} & 1
+    \end{bmatrix}\begin{bmatrix}
+      \mathbf{W}^{-1} & \boldsymbol{0} \\ {\boldsymbol{0}}^{\mathrm{T}} & \mu^{-1}
+    \end{bmatrix}\begin{bmatrix}
+      \mathbf{I} & \boldsymbol{0} \\ -{\boldsymbol{z}}_{\cdot i}^{\mathrm{T}} \mathbf{W}^{-1} & 1
+    \end{bmatrix} \\
+    &= \begin{bmatrix}
+      \mathbf{W}^{-1} + \mu^{-1}\mathbf{W}^{-1}\boldsymbol{z}_{i \cdot}{\boldsymbol{z}}_{\cdot i}^{\mathrm{T}}\mathbf{W}^{-1} & -\mu^{-1}\mathbf{W}^{-1}\boldsymbol{z}_{i \cdot} \\
+      -\mu^{-1}\boldsymbol{z}_{i \cdot}^\mathrm{T}\mathbf{W}^{-1} & \mu^{-1}
+    \end{bmatrix}.
+    \end{aligned}$$
+    Hence, $$
+    \begin{aligned}
+      \widetilde{\mathbf{\Gamma}} &= \begin{bmatrix}
+        \mathbf{Z} & \boldsymbol{e}_i
+      \end{bmatrix}\widetilde{\mathbf{W}}^{-1}\begin{bmatrix}
+        {\mathbf{Z}}^{\mathrm{T}} \\ {\boldsymbol{e}}_i^{\mathrm{T}}
+      \end{bmatrix} \\
+      &= \mathbf{Z}(\mathbf{W}^{-1} + \mu^{-1}\mathbf{W}^{-1}\boldsymbol{z}_{i \cdot}{\boldsymbol{z}}_{\cdot i}^{\mathrm{T}}\mathbf{W}^{-1}){\mathbf{Z}}^{\mathrm{T}} - \mu^{-1}\boldsymbol{e}_i \boldsymbol{z}_{i \cdot}^\mathrm{T}\mathbf{W}^{-1}{\mathbf{Z}}^{\mathrm{T}} - \mu^{-1}\mathbf{Z}\mathbf{W}^{-1}\boldsymbol{z}_{i \cdot}\boldsymbol{e}_i^\mathrm{T} + \boldsymbol{e}_i {\boldsymbol{e}}^{\mathrm{T}} \\
+      &= \mathbf{\Gamma} + \mu^{-1}(\boldsymbol{\gamma}_{\cdot i}\boldsymbol{\gamma}_{\cdot i}^\mathrm{T} - \boldsymbol{e}_i\boldsymbol{\gamma}_{\cdot i}^\mathrm{T} - \boldsymbol{\gamma}_{\cdot i}{\boldsymbol{e}}_i^{\mathrm{T}} + \boldsymbol{e}_i {\boldsymbol{e}}_i^{\mathrm{T}}) \\
+      &= \mathbf{\Gamma} + \mu^{-1}(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)^\mathrm{T}.
+      \label{eqn::gammaupdate}
+    \end{aligned}
+    $$
+    Therefore, the trace can be updated via $$
+    \begin{aligned}
+      \widetilde{t} - t &= \mathrm{tr}({\mathbf{X}}^{\mathrm{T}}(\mathbf{I} - \widetilde{\mathbf{\Gamma}})\mathbf{X}) - \mathrm{tr}({\mathbf{X}}^{\mathrm{T}}(\mathbf{I} - \mathbf{\Gamma})\mathbf{X}) \\
+      &= \mathrm{tr}({\mathbf{X}}^{\mathrm{T}}(\mathbf{\Gamma} - \widetilde{\mathbf{\Gamma}})\mathbf{X}) \\
+      &= -\mu^{-1}\mathrm{tr}({\mathbf{X}}^{\mathrm{T}}(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)^\mathrm{T}\mathbf{X}) \\
+      &= -\mu^{-1}||{\mathbf{X}}^{\mathrm{T}}(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)||_2^2.
+    \end{aligned}
+    $$
+    It is worthwhile to notice that to do not need calculating $\mathbf{W}$ and $\mathbf{\Gamma}$, as we do not care about constant terms in posterior probability. What we actually need is the ratio $$\frac{p(\mathbf{X}\mid \mathbf{Z}_{i,k}^{+},\sigma_X,\sigma_A)P(K_i^\text{new} = k\mid\alpha)}{p(\mathbf{X}\mid \mathbf{Z},\sigma_X,\sigma_A)P(K_i^\text{new} = 0\mid\alpha)} = \prod_{j = 0}^{k-1} \frac{p(\mathbf{X}\mid \mathbf{Z}_{i,j+1}^{+},\sigma_X,\sigma_A)P(K_i^\text{new} = j+1\mid\alpha)}{p(\mathbf{X}\mid \mathbf{Z}_{i,j}^{+},\sigma_X,\sigma_A)P(K_i^\text{new} = j\mid\alpha)},$$
+  or equivalently \begin{multline}\log p(\mathbf{X}\mid \mathbf{Z}_{i,j+1}^{+},\sigma_X,\sigma_A) - \log p(\mathbf{X}\mid \mathbf{Z}_{i,j}^{+},\sigma_X,\sigma_A) \\+ \log P(K_i^\text{new} = j+1\mid\alpha) - \log P(K_i^\text{new} = j\mid\alpha)
+  \label{eqn::logdiff}
+  \end{multline}
+    for $j = 0, 1,\cdots, k-1$.
+    In a recursive scheme, we can always view $\mathbf{Z}_{i,j}^+$ as baseline and $\mathbf{Z}_{i, j+1}^+$ is exactly adding a column $\boldsymbol{e}_i$ on the right of $\mathbf{Z}_{i,j}^+$.
+
+    Using the notations above, (\ref{eqn::logdiff}) can be evaluated as $$D\log \left(\frac{\sigma_X}{\sigma_A}\right) - \frac{D}{2}\log \mu + \frac{1}{2\sigma_X^2}\mu^{-1}||{\mathbf{X}}^{\mathrm{T}}(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)||_2^2.$$
+
+    Recall that $\mu = 1 + \lambda - \gamma_{ii}$ which can be obtained from $\boldsymbol{\gamma}_{\cdot i}$. It suffices to show that $\widetilde{\boldsymbol{\gamma}}_{\cdot i}$ can be updated directly through $\boldsymbol{\gamma}_{\cdot i}$.
+    It immediately follows (\ref{eqn::gammaupdate}) that $$\widetilde{\boldsymbol{\gamma}}_{\cdot i} = \boldsymbol{\gamma}_{\cdot i} + \mu^{-1}(\gamma_{ii} - 1)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i).$$
 \end{appendices}
 
 \end{document}
