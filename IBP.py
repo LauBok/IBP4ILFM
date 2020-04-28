@@ -2,6 +2,7 @@ import numpy as np
 from tqdm import tqdm,trange
 import random
 import sys
+import sympy 
 
 class IBP:
     def __init__(self, X, Z = None, sigma_X = 1, sigma_A = 1, alpha = 1):
@@ -74,12 +75,19 @@ class IBP:
         for i in random.sample(range(self.N), self.N):
             self.sampleZ(i)
             self.sampleK(i)
+        self.simplify()
         if self.alpha_update:
             self.sampleAlpha()
         if self.sigma_X_update:
             self.sampleSigmaX()
         if self.sigma_A_update:
             self.sampleSigmaA()
+    
+    def simplify(self):
+        _, inds = sympy.Matrix(self.Z).rref()
+        self.Z = self.Z[:, inds]
+        self.K = self.Z.shape[1]
+        return self
 
     def _lp_original(self, Z = None, sigma_X = None, sigma_A = None):
         if Z is None:
@@ -145,7 +153,7 @@ class IBP:
         d = S ** 2 / (S ** 2 + self.sigma_X**2/self.sigma_A**2)
         gamma_i = U @ (d * U[i,])
         cur_diff = cnt = 0
-        while cur_diff > log_thres:
+        while cnt + self.K < self.N and cur_diff > log_thres:
             cnt += 1
             mu = 1 + self.sigma_X**2/self.sigma_A**2 - gamma_i[i]
             t = 1/mu * np.sum((self.X.T @ gamma_i - self.X[i])**2)
@@ -193,16 +201,16 @@ class IBP:
 
     def sampleSigmaX(self, epsilon = 0.01):
         new_sigma_X = IBP.wallRandomWalk(self.sigma_X, epsilon, wall = (0, None))
-        log_p = (self.sigma_X_a - 1) * (np.log(new_sigma_X) - np.log(self.sigma_X))
-        log_p -= self.sigma_X_b * (new_sigma_X - self.sigma_X)
+        log_p = (-self.sigma_X_a - 1) * (np.log(new_sigma_X) - np.log(self.sigma_X))
+        log_p -= self.sigma_X_b * (1/new_sigma_X - 1/self.sigma_X)
         log_p += self.lp(sigma_X = new_sigma_X) - self.lp()
         if IBP.binary(min(0,log_p), type = 'log'):
             self.sigma_X = new_sigma_X
     
     def sampleSigmaA(self, epsilon = 0.01):
         new_sigma_A = IBP.wallRandomWalk(self.sigma_A, epsilon, wall = (0, None))
-        log_p = (self.sigma_A_a - 1) * (np.log(new_sigma_A) - np.log(self.sigma_A))
-        log_p -= self.sigma_A_b * (new_sigma_A - self.sigma_A)
+        log_p = (-self.sigma_A_a - 1) * (np.log(new_sigma_A) - np.log(self.sigma_A))
+        log_p -= self.sigma_A_b * (1/new_sigma_A - 1/self.sigma_A)
         log_p += self.lp(sigma_A = new_sigma_A) - self.lp()
         if IBP.binary(min(0,log_p), type = 'log'):
             self.sigma_A = new_sigma_A
