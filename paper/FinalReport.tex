@@ -26,10 +26,22 @@
 \usepackage{nicefrac}       % compact symbols for 1/2, etc.
 \usepackage{microtype}      % microtypography
 \usepackage{amsmath}
+\usepackage{caption}
+\usepackage{subcaption}
 \usepackage{mathtools}
+\usepackage{amssymb}
 \usepackage[ruled,linesnumbered]{algorithm2e}
 \usepackage{multirow}
 \usepackage[toc,page]{appendix}
+
+\usepackage{xcolor}
+\hypersetup{
+    colorlinks,
+    linkcolor={red!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!80!black}
+}
+
 \title{Gibbs Sampler for Infinite Latent Feature Models}
 
 % The \author macro works with any number of authors. There are two commands
@@ -95,10 +107,12 @@ All of these methods confront the critical challenge to determine how many laten
 
 Dirichlet and Beta process have been studied as priors in non-parametric Bayesian modelling. Both processes can be reparameterized with stick breaking processes \citep{broderick2012beta, paisley2011stick}. Moreover, these processes can be specified by sequential processes, respectively, the Chinese restaurant process \citep{griffiths2004hierarchical} and the Indian Buffet process \citep{thibaux2007hierarchical}. 
 
-\citet{ghahramani2006infinite} describes how Indian buffet process can be used as a prior in statistical models where each object is represented by a subset of infinite features \citep[also see][]{griffiths2005infinite}. In this paper, we implement a Gibbs sampler which generates Dirichlet process as a prior and samples from the posterior distribution. The article is organized as follows. \textcolor{red}{Description, Optimization, Simulation, Application, Analysis, Discussion.}
+\citet{ghahramani2006infinite} describes how Indian buffet process can be used as a prior in statistical models where each object is represented by a subset of infinite features \citep[also see][]{griffiths2005infinite}. In this paper, we implement a Gibbs sampler which generates Dirichlet process as a prior and samples from the posterior distribution. 
+
+We describe the algorithm in Section \ref{sec::description} and introduce the optimization on our implementation in Section \ref{sec::optimization}. In Sections \ref{sec::simulation} and \ref{sec::realdata} we show how the algorithm can be applied to extract latent features in an image. The algorithm performs well with both simulated data and real data. We compare our implementation with other similar ones in Section \ref{sec::comparison}, and conclude in Section \ref{sec::discussion}. 
 
 
-\section{Description of the algorithm}
+\section{Description of the algorithm}\label{sec::description}
 
 We implemented a Gibbs sampler on a linear-Gaussian binary latent feature model, where each observation is assumed to contain some of underlying features. The prior on the feature matrix is Gaussian, and the prior on the (binary) indicator matrix is a Dirichlet process. Our sampler is able to sample the indicators and the features from their posterior distributions.
 
@@ -112,18 +126,18 @@ For Gibbs sampler, we use a number in bracket to indicate a sample in a specific
 
 \subsection{Priors and assumptions}
 \begin{itemize}
-  \item We define an Indian buffet process on the prior of $\mathbf{Z}$. The Indian buffet process scheme is introduced by \citet[Sec 2.4]{griffiths2005infinite}. Using $K_1^{(i)}$ to indicate the number of new dishes sampled by the $i$-th customer, the probability of any particular matrix being produce by the IBP is $$P(\mathbf{Z}\mid\alpha) = \frac{\alpha^{K}}{\prod_{i=1}^NK_1^{(i)}!}\exp\{-\alpha H_N\}\prod_{k=1}^K\frac{(N - m_k)!(m_k - 1)!}{N!},$$
-  where $m_k = \sum_{i=1}^N z_{ik}$ is the number of objects possessing feature $k$, and $$H_N = \sum_{n = 1}^N\frac{1}{n}.$$
-  \item The feature matrix has a Gaussian prior $$\mathbf{A}\mid K, \sigma_A\sim \mathcal{MN}(\mathbf{O}_{K\times D}, \mathbf{I}_K, \sigma_A^2\mathbf{I}_D).$$
-  \item Given $\mathbf{Z}$ and $\mathbf{A}$, the distribution of $\mathbf{X}$ is Gaussian $$\mathbf{X}\mid \mathbf{Z}, \mathbf{A}, \sigma_X \sim \mathcal{MN}(\mathbf{ZA}, \mathbf{I}_N, \sigma_X^2\mathbf{I}_D).$$
+  \item We define an Indian buffet process on the prior of $\mathbf{Z}$. The Indian buffet process scheme is introduced by \citet[Sec 2.4]{griffiths2005infinite}. Using $K_1^{(i)}$ to indicate the number of new dishes sampled by the $i$-th customer, the probability of any particular matrix being produce by the IBP is \begin{equation}P(\mathbf{Z}\mid\alpha) = \frac{\alpha^{K}}{\prod_{i=1}^NK_1^{(i)}!}\exp\{-\alpha H_N\}\prod_{k=1}^K\frac{(N - m_k)!(m_k - 1)!}{N!},\end{equation}
+  where $m_k = \sum_{i=1}^N z_{ik}$ is the number of objects possessing feature $k$, and \begin{equation}H_N = \sum_{n = 1}^N\frac{1}{n}.\end{equation}
+  \item The feature matrix has a Gaussian prior \begin{equation}\mathbf{A}\mid K, \sigma_A\sim \mathcal{MN}(\mathbf{O}_{K\times D}, \mathbf{I}_K, \sigma_A^2\mathbf{I}_D).\end{equation}
+  \item Given $\mathbf{Z}$ and $\mathbf{A}$, the distribution of $\mathbf{X}$ is Gaussian \begin{equation}\mathbf{X}\mid \mathbf{Z}, \mathbf{A}, \sigma_X \sim \mathcal{MN}(\mathbf{ZA}, \mathbf{I}_N, \sigma_X^2\mathbf{I}_D).\end{equation}
   \item The prior distribution of $\alpha$, $\sigma_A$ and $\sigma_X$ are gamma distributions.
-  $$
+  \begin{equation}
   \begin{aligned}
     \alpha &\sim \mathcal{G}(\alpha^a, \alpha^b);\\
-    \sigma_X &\sim \mathcal{G}(\sigma_X^a,\sigma_X^b);\\
-    \sigma_A &\sim \mathcal{G}(\sigma_A^a, \sigma_A^b).
+    \sigma_X &\sim \mathcal{G}^{-1}(\sigma_X^a,\sigma_X^b);\\
+    \sigma_A &\sim \mathcal{G}^{-1}(\sigma_A^a, \sigma_A^b).
   \end{aligned}
-  $$
+  \end{equation}
   \item If a column of $\mathbf{Z}$ are all $0$'s, this column as well as the corresponding row in $\mathbf{A}$ are removed, as no entries in this column will be assigned $1$ in the Gibbs sampler.
 \end{itemize}
 
@@ -138,34 +152,34 @@ For Gibbs sampler, we use a number in bracket to indicate a sample in a specific
   
   As the dimension of $\mathbf{Z}$ may change through the sampling, we need to find the full conditional for both the original and the (potential) additional columns of $\mathbf{Z}$.
   \begin{itemize}
-    \item For $k = 1, \cdots, K$, $$P(z_{ik}\mid \mathbf{X},\mathbf{Z}_{-(i,k)}, \sigma_X, \sigma_A)\propto p(\mathbf{X}\mid \mathbf{Z}, \sigma_X, \sigma_A)P(z_{ik}\mid \boldsymbol{z}_{-i, k}),$$
+    \item For $k = 1, \cdots, K$, \begin{equation}P(z_{ik}\mid \mathbf{X},\mathbf{Z}_{-(i,k)}, \sigma_X, \sigma_A)\propto p(\mathbf{X}\mid \mathbf{Z}, \sigma_X, \sigma_A)P(z_{ik}\mid \boldsymbol{z}_{-i, k}),\end{equation}
     where $P(z_{ik} = 1\mid\boldsymbol{z}_{-i, k}) = \frac{m_{-i, k}}{N}$.
 
     $m_{-i,k}$ denotes the number of objects possessing feature $k$, excluding $i$.
     \item There might be $K_i^\text{new}$ columns added to $\mathbf{Z}$, each additional column being $\boldsymbol{e}_i$.
-    $$P(K_i^\text{new}\mid \mathbf{X},\mathbf{Z},\sigma_X,\sigma_A,\alpha) \propto p(\mathbf{X}\mid \mathbf{Z}_{i,K_i^\text{new}}^{+},\sigma_X,\sigma_A)P(K_i^\text{new}\mid\alpha),$$
-    where $K_i^\text{new}\mid \alpha \sim \mathrm{Possion}(\alpha/N)$, $$\mathbf{Z}_{i,K_i^\text{new}}^+ = \begin{pmatrix}
+    \begin{equation}P(K_i^\text{new}\mid \mathbf{X},\mathbf{Z},\sigma_X,\sigma_A,\alpha) \propto p(\mathbf{X}\mid \mathbf{Z}_{i,K_i^\text{new}}^{+},\sigma_X,\sigma_A)P(K_i^\text{new}\mid\alpha),\end{equation}
+    where $K_i^\text{new}\mid \alpha \sim \mathrm{Possion}(\alpha/N)$, 
+    \begin{equation}\mathbf{Z}_{i,K_i^\text{new}}^+ = \begin{pmatrix}
       \mathbf{Z}, \smash{\underbrace{\boldsymbol{e}_i, \cdots, \boldsymbol{e}_i}_{K_i^\mathrm{new}\text{ columns}}}
-    \end{pmatrix}.$$
+    \end{pmatrix}.\end{equation}
   \end{itemize}
   \item Full conditional for $\alpha$:
-  $$\alpha\mid \mathbf{Z}\sim \mathcal{G}(\alpha^a + K, \alpha^b + H_N).$$
+  \begin{equation}\alpha\mid \mathbf{Z}\sim \mathcal{G}(\alpha^a + K, \alpha^b + H_N).\end{equation}
   \item Full conditional for $\sigma_X$ and $\sigma_A$:
-  $$
+  \begin{equation}
   \begin{aligned}
     p(\sigma_X\mid \mathbf{X}, \mathbf{Z}, \sigma_A) &\propto p(\mathbf{X}\mid \mathbf{Z},\sigma_X, \sigma_A) p(\sigma_X), \\
     p(\sigma_A\mid \mathbf{X}, \mathbf{Z}, \sigma_X) &\propto p(\mathbf{A}\mid \mathbf{Z},\sigma_X, \sigma_A) p(\sigma_X). \\
   \end{aligned}
-  $$
+\end{equation}
 \end{itemize}
 \subsection{Gibbs sampler}
 \begin{algorithm}
   \caption{Gibbs sampler for linear-Gaussian binary latent feature model}
   \KwData{An $N\times D$ matrix $\mathbf{X}$}
-  \KwIn{Number of iterations $T$ and hypermeters $\alpha^a$, $\alpha^b$, $\sigma_X^a$, $\sigma_X^b$, $\sigma_A^a$, $\sigma_A^b$}
+  \KwIn{Number of iterations $T$, initial values of $\alpha^{(0)}$, $\sigma_X^{(0)}$, $\sigma_A^{(0)}$, and hypermeters $\alpha^a$, $\alpha^b$, $\sigma_X^a$, $\sigma_X^b$, $\sigma_A^a$, $\sigma_A^b$}
   \KwOut{Results of $\mathbf{Z}$, $\alpha$, $\sigma_X$, $\sigma_A$ in each iteration}
 
-  Sample $\alpha^{(0)}\in\mathcal{G}(\alpha^a,\alpha^b)$, $\sigma_X^{(0)}\in\mathcal{G}(\sigma_X^a,\sigma_X^b)$ and $\sigma_A^{(0)}\in\mathcal{G}(\sigma_A^a,\sigma_A^b)$\;
   Sample $\mathbf{Z}^{(0)}$ from Indian buffet process\;
   \For{$t = 1$ to $T$}{
     \For{$i$ in randomized $1:N$}{
@@ -180,7 +194,7 @@ For Gibbs sampler, we use a number in bracket to indicate a sample in a specific
   } 
 \end{algorithm}
 
-\section{Optimization}
+\section{Optimization}\label{sec::optimization}
 In code optimization and speeding, an important philosophy is given by the Amdahl's law \citep{Amdahl10.1145/1465482.1465560} and the Gustafson's law \citep{10.1145/42411.42415}. Both laws state that the upper bound of theorical speedup on a part of a system depends on the frequency this part is used. In parallel programming, these laws also show how much acceleration can be expected after dispatching the workload onto multiple cores.
 
 Guided by these laws, we prioritized the optimization of code based on the frequency of execution and the maximum possible speedup ratio. We first design algorithms that have lower asymptotic time complexity. Afterwards, we tried optimization based on numba, cython, which is implemented in static programming languages such as C or C++. 
@@ -218,15 +232,15 @@ For numerical stability, we calculate the log conditional likelihood instead, wh
   -\frac{1}{2\sigma_X^2}\mathrm{tr}\left\{{\mathbf{X}}^{\mathrm{T}}\left(\mathbf{I}-\mathbf{Z}\left({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}\right)^{-1}{\mathbf{Z}}^{\mathrm{T}}\right)\mathbf{X}\right\}.
 \end{multline}
 
-Suppose the singular value decomposition of $\mathbf{Z}$ is $$\mathbf{Z} = \mathbf{U}\mathrm{diag}(\boldsymbol{d}){\mathbf{V}}^{\mathrm{T}},$$
-where ${\mathbf{U}}^{\mathrm{T}}\mathbf{U} = \mathbf{I}$, ${\mathbf{V}}^{\mathrm{T}}\mathbf{V} = \mathbf{V}{\mathbf{V}}^{\mathrm{T}} = \mathbf{I}$. Then, $$\left|{\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}\right| = \prod_{i=1}^{\min\{N, K\}}\left( d_i^2 + \frac{\sigma_X^2}{\sigma_A^2} \right),$$
-$$
+Suppose the singular value decomposition of $\mathbf{Z}$ is \begin{equation}\mathbf{Z} = \mathbf{U}\mathrm{diag}(\boldsymbol{d}){\mathbf{V}}^{\mathrm{T}},\end{equation}
+where ${\mathbf{U}}^{\mathrm{T}}\mathbf{U} = \mathbf{I}$, ${\mathbf{V}}^{\mathrm{T}}\mathbf{V} = \mathbf{V}{\mathbf{V}}^{\mathrm{T}} = \mathbf{I}$. Then, \begin{equation}\left|{\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}\right| = \prod_{i=1}^{\min\{N, K\}}\left( d_i^2 + \frac{\sigma_X^2}{\sigma_A^2} \right),\end{equation}
+\begin{equation}
 \begin{aligned}
   \mathrm{tr}\left\{{\mathbf{X}}^{\mathrm{T}}\left(\mathbf{I}-\mathbf{Z}\left({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}\right)^{-1}{\mathbf{Z}}^{\mathrm{T}}\right)\mathbf{X}\right\} = \mathrm{tr}({\mathbf{X}}^{\mathrm{T}}\mathbf{X}) - \sum_{i=1}^{\min\{N, K\}}\frac{d_i^2}{d_i^2 + \sigma_X^2/\sigma_A^2}||\boldsymbol{u}_{\cdot i}^\mathrm{T}\mathbf{X}||_2^2.
 \end{aligned}
-$$
+\end{equation}
 The proof is provided in Appendix \ref{app::proof1}.
-The value of $\mathrm{tr}({\mathbf{X}}^{\mathrm{T}}\mathbf{X})$ can be calculated and stored before the iteration steps, and thus the time on calculating this term is negligible.
+The value of $\mathrm{tr}({\mathbf{X}}^{\mathrm{T}}\mathbf{X})$ can be calculated and stored before the iteration steps, and thus the time on calculating this term is negligible. The comparison on time complexity of calculating the conditional likelihood is shown in Table \ref{tbl::timecp1}.
 
 \begin{table}[!h]
   \centering
@@ -244,15 +258,19 @@ The value of $\mathrm{tr}({\mathbf{X}}^{\mathrm{T}}\mathbf{X})$ can be calculate
 \end{table}
 
 \subsection{Optimization on sampling $K_i^{\text{new}}$}\label{sec::K}
+In each iteration, this procedure is executed $N$ times. This is smaller than \texttt{lp} by a multipler of $K$. However, in most applications where the number of latent features are expected to be low, this procedure takes comparative amount time with \texttt{lp} (excluding calls on \texttt{lp} within the procedure). 
+
 Although we can express the posterior as proportional to the multiplication of likelihood and prior, it is rather difficult to find the normalization term as it involves an infinite sum which does not have a closed form result. In practice, we use a truncated distribution instead; set a large upper bound $C$ for the value of $K_i^\text{new}$ and calculate the posterior probability of each value. The prior, which is a poisson distribution, is easy and fast to calculate. Hence, it is important to speed up finding the likelihood.
 
 Definitely, we can use the improved version in Section \ref{sec::lp}. However, we may note that the matrices $\mathbf{Z}$ passed into \texttt{lp} are related, in the sense that for each increment of $K_i^\text{new}$, $\mathbf{Z}$ is appended by a column $\boldsymbol{e}_i$ on the right.
 
 Let $\widetilde{\mathbf{Z}} = \begin{bmatrix}
   \mathbf{Z} & \boldsymbol{e}_i
-\end{bmatrix}$, $\mathbf{W} = {\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}$, $\mathbf{\Gamma} = \mathbf{Z}({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}){\mathbf{Z}}^{\mathrm{T}}$, $t = \mathrm{tr}\{{\mathbf{X}}^{\mathrm{T}}(\mathbf{I}-\mathbf{Z}({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I})^{-1}{\mathbf{Z}}^{\mathrm{T}})\mathbf{X}\}$, and define $\widetilde{\mathbf{W}}$, $\widetilde{\mathbf{\Gamma}}$, $\widetilde{t}$ similarly. For simplicity of notation, we define $\mu = 1 + \frac{\sigma_X^2}{\sigma_A^2} - \gamma_{ii}$. It can be shown (see Appendix \ref{app::proof2}) that $$|\widetilde{\mathbf{W}}| = \mu|\mathbf{W}|,~\widetilde{\boldsymbol{\gamma}}_{\cdot i} = \boldsymbol{\gamma}_{\cdot i} + \mu^{-1}(\gamma_{ii} - 1)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i),$$
+\end{bmatrix}$, $\mathbf{W} = {\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}$, $\mathbf{\Gamma} = \mathbf{Z}({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I}){\mathbf{Z}}^{\mathrm{T}}$, $t = \mathrm{tr}\{{\mathbf{X}}^{\mathrm{T}}(\mathbf{I}-\mathbf{Z}({\mathbf{Z}}^{\mathrm{T}}\mathbf{Z}+\frac{\sigma_X^2}{\sigma_A^2}\mathbf{I})^{-1}{\mathbf{Z}}^{\mathrm{T}})\mathbf{X}\}$, and define $\widetilde{\mathbf{W}}$, $\widetilde{\mathbf{\Gamma}}$, $\widetilde{t}$ similarly. For simplicity of notation, we define $\mu = 1 + \frac{\sigma_X^2}{\sigma_A^2} - \gamma_{ii}$. It can be shown (see Appendix \ref{app::proof2}) that \begin{equation}|\widetilde{\mathbf{W}}| = \mu|\mathbf{W}|,~\widetilde{\boldsymbol{\gamma}}_{\cdot i} = \boldsymbol{\gamma}_{\cdot i} + \mu^{-1}(\gamma_{ii} - 1)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i),\end{equation}
 and
-$$\widetilde{t} = t - \mu^{-1}||\mathbf{X}^\mathrm{T}\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{x}_{i\cdot}||_2^2.$$
+\begin{equation}\widetilde{t} = t - \mu^{-1}||\mathbf{X}^\mathrm{T}\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{x}_{i\cdot}||_2^2.\end{equation}
+
+  The comparison on time complexity of sampling $K_i^\text{new}$ is shown in Table \ref{tbl::timecp2}.
 
 \begin{table}[!h]
   \centering
@@ -263,7 +281,8 @@ $$\widetilde{t} = t - \mu^{-1}||\mathbf{X}^\mathrm{T}\boldsymbol{\gamma}_{\cdot 
     \toprule
      & Time Complexity & Under Assumption 1 & Under Assumption 2 \\
     \midrule
-    Original & {\scriptsize$O(CN^2D + CND^2 + CN^2K + CNK^2 + CK^3)$} & $O(CN^2D + CND^2)$ & $O(CN^2D)$ \\
+    \multirow{2}{*}{Original} & $O(CN^2D + CND^2 + CN^2K $ & \multirow{2}{*}{$O(CN^2D + CND^2)$} & \multirow{2}{*}{$O(CN^2D)$} \\
+    & $+ CNK^2 + CK^3)$ & &\\
     Improved \texttt{lp} & $O(CN(K + D)\min\{N, K\})$ & $O(CNDK)$ & $O(CNDK)$ \\
     Recursive & $O(NK\min\{N, K\} + CND)$ & $O(NK^2 + CND)$ & $O(NK^2 + CND)$ \\
     \bottomrule
@@ -373,15 +392,95 @@ We tested the accuracy of both optimizations, and recorded the respective execut
 
 \subsection{Optimization through parallelism}
 
-\subsection{Optimization using C++}
+Gibbs samplers generate dependent samples from a Markov Chain. As the $n$-th iteration is based upon the $(n-1)$-th iteration, it is unlikely feasible to parallel the sampling process into multiple cores. Although matrix operations generally can be performed in parallel, \texttt{numpy} module is already highly optimized by utilizing cache memory and assembler implementation. Moreover, many architectures now enable BLAS to take advantage of a multicore machine. Thus, we did not optimize the code further through parallelism.
+\subsection{Optimization via C++}
+Most of \texttt{numpy} functions are implemented in C/C++, so there is little advantage of rewriting built-in functions in risk of numerical instability. However, we may reduce the interpretation time by ahead-of-time compilation (which can be done through modules, e.g. \texttt{numba}\citep{numba10.1145/2833157.2833162}), explicitly declaring variable types and turn off checks where safety is assured.
 
-\section{Simulation}
 
-\section{Applications}
+\begin{figure}[!h]
+  \centering
+  \begin{subfigure}[b]{\textwidth}
+    \centering
+    \includegraphics[width = 9.5cm]{tetris.png}
+    \caption{Basic tetris-like patterns}
+    \label{fig::tetris}
+  \end{subfigure}
+  \begin{subfigure}[b]{\textwidth}
+    \centering
+    \includegraphics[width = 9.5cm]{tetrisfeature.png}
+    \caption{Features extracted from the data}
+    \label{fig::tetrisfeature}
+  \end{subfigure}
+  \begin{subfigure}[b]{\textwidth}
+    \centering
+    \includegraphics[width = 9.5cm]{tetrisdetection.png}
+    \caption{Features detected in images} 
+    \label{fig::tetrisfeature}
+  \end{subfigure}
+  \caption{(b) Results of extracted features from the Gibbs sampler. These features perfectly coincide with the basic patterns, ignoring background noise. (c) Ten images are randomly selected and the labels corresponds to latent features detected from the Gibbs sampler.}
+\end{figure}
 
-\section{Comparative Analysis}
+\begin{figure}[!h]
+  \centering
+  \includegraphics[width = \textwidth]{gibbsresultblock.png}
+  \caption{Trace plots for the dimensionality and parameters over $1000$ iterations of sampling. The posterior estimation of $\sigma_X = 0.0996$ is quite close to the true value $0.1$.}
+  \label{fig::gibbsblock}
+\end{figure}
 
-\section{Discussion}
+\section{Simulation}\label{sec::simulation}
+
+We performed a simulation study on a dataset of images generated from basic five tetris-like patterns (Fig \ref{fig::tetris}). Each image consists of one or multiple patterns and is disturbed by a random noise. Each pattern is embedded in a $6\times 6$ matrix which can be reshaped into a $36$-dimension vector. To elaborate it mathematically, let $\boldsymbol{f}_1, \cdots, \boldsymbol{f}_5$ represent the patterns in vector forms. The images $\{\boldsymbol{x}_{i}\}_{i=1}^N$ are independently generated by \begin{equation}\boldsymbol{x}_i = \sum_{j=1}^5 c_j \boldsymbol{f}_j + \boldsymbol{e}_i,\end{equation} where $c_j\in\{0,1\}$ are not all zero and $\boldsymbol{e}_i\sim\mathcal{N}(\boldsymbol{0}, 0.01 \mathbf{I})$.
+
+
+The true value of $\sigma_X = 0.1$ under this setting. The parameters are initialized with $\sigma_X = \sigma_A = \alpha = 1$ and updated via Monte Carlo and Metropolis steps. The Gibbs sampler went through 1000 iterations, and stabilized in approximately $400$ iterations (Fig \ref{fig::gibbsblock}). The algorithm found $5$ latent features which perfectly indicated the presence and absence of the five patterns.
+
+\section{Latent features in poker card images}\label{sec::realdata}
+
+We applied this Gibbs sampler on a dataset consisting of $1056\times 691$ pixel PNG images of poker cards. We selected out 100 images from the suit of diamonds excluding Jack, Queen and King, cropped and downsampled each image to $80\times 44$ pixels in grayscale. We represented each image $\boldsymbol{x}_i$ by a flattened vector of $3520$ dimensions. An example of an original image and the corresponding processed image is shown in Fig \ref{fig::sample}. The Gibbs sampler was initialized with $\sigma_X = 0.15$, $\sigma_A = 0.25$ and $\alpha = 1$, and stabilized after approximately 100 iterations. We extracted the mean image in observance of the zero-mean prior on the features, and $14$ other latent features were suggested (Fig \ref{fig::gibbs}). The latent features, along with the reconstructed images are shown in Fig \ref{fig::featuremap}. 
+
+\begin{figure}[!h]
+  \centering
+  \begin{subfigure}[b]{0.35\textwidth}
+    \centering
+    \includegraphics[width = 2.75cm]{sample_original.png}
+    \caption{Original image}
+  \end{subfigure} 
+  \begin{subfigure}[b]{0.35\textwidth}
+    \centering
+    \includegraphics[width = 2.3cm]{sample_cropped.png}
+    \caption{Processed image}
+  \end{subfigure}
+  \caption{The original and processed image of ten of diamonds (10$\blacklozenge$)}
+  \label{fig::sample}
+\end{figure}
+
+\begin{figure}[!h]
+  \centering
+  \includegraphics[width = \textwidth]{gibbsresult.png}
+  \caption{Trace plots for the dimensionality and parameters over $300$ iterations of sampling.}
+  \label{fig::gibbs}
+\end{figure}
+
+\begin{figure}[!h]
+  \centering
+  \includegraphics[width = \textwidth]{featuremap.png} 
+  \caption{Feature matrix in the left-ordered form. The mean image (left) and $14$ features are shown on the top. The left-most column are the images for the first suit of cards, and the images reconstructed from the features are displayed on the right respectively. The rectangles in the middle indicates which features are possessed by the images, with colored rectangles showing possession and the gray ones showing non-possession. The shades of color indicate the frequency of that feature being possessed. Both indicators and the reconstructed images are based upon the 300th sample.}
+  \label{fig::featuremap}
+\end{figure}
+
+Although it is hard to interprete all these latent features, it is delighting to see that the features are able to capture the symmetry in most card images and reveal some particular patterns. For example, feature 1 (excluding the mean image) captures the pattern of a diamond in the center (light) with no diamonds in the corners (dark), which is shared by A$\blacklozenge$ and 3$\blacklozenge$. It is also interesting to note some enhancing-declining pairs in these features. Feature 7 and 8 have opposite effects, as a dark diamond in the center removes it from 4$\blacklozenge$ and a light one enhances it on 5$\blacklozenge$. Similarly goes for feature 3 through 5. These features demonstrate a pattern of two diamonds vertically arranged in the middle. Feature 3 declines both diamonds while feature 5 enhances them. Feature 4, which has both a light and a dark diamond, enhances the one on the top and declines the other at the bottom. These features contribute to the difference among 6$\blacklozenge$, 7$\blacklozenge$ and 8$\blacklozenge$.
+
+\section{Comparative Analysis}\label{sec::comparison}
+Feature extraction, which involves reduceing the dimensionality of original data, plays a significant role in data analysis. Through feature extraction, data in high dimensionality are embedded into a low dimension space while still being described with sufficient accuracy. Many feature extraction techniques have been proposed, from traditional methods on low-rank matrix approximation (e.g. PCA) to neural network based algorithms (e.g. autoencoder). A majority of these methods, however, requires predetermined hyperparameters controlling the number of features. On the poker card dataset, principal component analysis (PCA) requires 49 features to maintain information akin to our method (measured in variance). Although as few as $8$ components are sufficient to reconstruct the images with differences imperceptable to human eyes, determination on this number requires domain knowledge. Our methods extracted $14$ features without manual selection, which is slightly more redundant than $8$. However, it outperforms much over $49$ features suggested by PCA comparably in absense of manual selection.
+
+Some other implementations can be found on the same algorithm as introduced in this paper, one of which is given by \citet{chai}. The authors of that implementation was able to reduce the running time by utilizing the one-rank update of matrix inversion \citep{griffiths2005infinite}, they failed to exploit sufficiently for potential speedup possibility. Another implementation is from an opensource repository \texttt{PyIBP} \citep{davidandrjez}.
+
+The execution time of these implementations was recorded respectively under the same dataset. The profiling information is given in Table \textcolor{red}{xx}.
+
+\section{Discussion}\label{sec::discussion}
+We have demonstrated that our implementation of the algorithm proposed by \citet{griffiths2005infinite} achieved satisfactory accuracy and efficiency. Also, we applied the algorithm on datasets where the observations are exchangeable and each observation possesses a finite subset of infinite latent features, and obtained reasonable and interpretable results. The strategy of taking the limit of a finite model from latent classes to infinite features provides a direction for a wild class of latent structures, such as in \citet{teh2006hierarchical} and \citet{chen2011hierarchical}.
+
+Although the algorithm we implemented upon extended the models from definite latent classes to a set of latent features, limiting $\mathbf{Z}$ within the class of binary matrices may not be appropriate for many datasets. This constraint can be relaxed by allowing $\mathbf{Z}$ to take on natural numbers (count of features) or real numbers (proportion of features). Furthermore, the model is sensitive to location and scale. Identical patterns appearing in various position and size are not considered the same feature, which entangles its application in object detection or pattern recognition. Further work can be done on the improvement of the algorithm.
 
 \bibliographystyle{plainnat}
 \bibliography{ref}
@@ -393,28 +492,28 @@ We tested the accuracy of both optimizations, and recorded the respective execut
     Assume $\mathbf{Z}$ is an $M\times K$ matrix and $M\gg K$. Denote $\lambda = \sigma_X^2 / \sigma_A^2$.
     Let $\mathbf{Z} = \mathbf{U}\mathbf{D}\mathbf{V}^\mathrm{T}$ be the singular value decomposition of $\mathbf{Z}$, where $\mathbf{D} = \mathrm{diag}\{d_1,\cdots, d_K\}$. 
 
-    $$
+    \begin{equation}
     \begin{aligned}
       \mathbf{Z}^\mathrm{T}\mathbf{Z} + \lambda \mathbf{I} &= \mathbf{V}\mathbf{D}^2 \mathbf{V}^\mathrm{T} + \lambda \mathbf{I} \\
       &= \mathbf{V} (\mathbf{D}^2 + \lambda \mathbf{I}) \mathbf{V}^\mathrm{T}.
     \end{aligned}
-    $$
+  \end{equation}
     Therefore, $|{\mathbf{Z}}^{\mathrm{T}}\mathbf{Z} + \lambda \mathbf{I}| = |\mathbf{D}^2 + \lambda \mathbf{I}| = \prod_{k=1}^K (d_k^2 + \lambda)$, and
-    $$
+    \begin{equation}
     \begin{aligned}
       \mathrm{tr}\left( \mathbf{X}^\mathrm{T} \left(\mathbf{I} -  \mathbf{Z} \left(\mathbf{Z}^\mathrm{T}\mathbf{Z} + \lambda \mathbf{I} \right)^{-1} \mathbf{Z}^\mathrm{T} \right) \mathbf{X} \right) &= \mathrm{tr}\left( {\mathbf{X}}^{\mathrm{T}} \mathbf{X}\right) - \mathrm{tr}\left( \mathbf{X}^\mathrm{T}\mathbf{U}\mathbf{\Lambda}\mathbf{U}^\mathrm{T}\mathbf{X} \right),
     \end{aligned}
-    $$
+  \end{equation}
     where $\mathbf{\Lambda} = \mathrm{diag}\{d_k^2/(d_k^2 + \lambda), k = 1,\cdots, K\}$. 
-    The second term can be efficiently calculated. $$
+    The second term can be efficiently calculated. \begin{equation}
     \begin{aligned}
       \mathrm{tr}(\mathbf{X}^\mathrm{T}\mathbf{U}\mathbf{\Lambda}\mathbf{U}^\mathrm{T}\mathbf{X}) &= \mathrm{tr}\left(\sum_{k = 1}^K \frac{d_k^2}{d_k^2 + \lambda}{\mathbf{X}}^{\mathrm{T}}\boldsymbol{u}_{\cdot k}\boldsymbol{u}_{\cdot k}^\mathrm{T}\mathbf{X}\right) \\
       &= \sum_{k=1}^K \frac{d_k^2}{d_k^2 + \lambda}\boldsymbol{u}_{\cdot k}^\mathrm{T}\mathbf{X}{\mathbf{X}}^{\mathrm{T}}\boldsymbol{u}_{\cdot k}\\ 
       &= \sum_{k=1}^K \frac{d_k^2}{d_k^2 + \lambda}||{\mathbf{X}}^{\mathrm{T}}\boldsymbol{u}_{\cdot k}||_2^2.
     \end{aligned}
-    $$
+  \end{equation}
   \subsection{Proof of sampling $K_i^\text{new}$}\label{app::proof2}
-    $$
+    \begin{equation}
     \begin{aligned}
       \widetilde{\mathbf{W}} = {\widetilde{\mathbf{Z}}}^{\mathrm{T}}\widetilde{\mathbf{Z}} + \lambda \mathbf{I} &= \begin{bmatrix}
         {\mathbf{Z}}^{\mathrm{T}} \\ {\boldsymbol{e}}_i^{\mathrm{T}}
@@ -426,7 +525,7 @@ We tested the accuracy of both optimizations, and recorded the respective execut
         {\boldsymbol{z}}_{\cdot i}^{\mathrm{T}} & 1 + \lambda
       \end{bmatrix}.
     \end{aligned}
-    $$
+  \end{equation}
     By elementary transform of block matrix, 
     \begin{equation}
       \begin{bmatrix}
@@ -440,9 +539,9 @@ We tested the accuracy of both optimizations, and recorded the respective execut
     \label{eqn::elemblocktrans}
     \end{equation}
     Note that ${\boldsymbol{z}}_{\cdot i}^{\mathrm{T}} \mathbf{W}^{-1}{\boldsymbol{z}}_{\cdot i} = \gamma_{ii}$, and let $\mu = 1 + \lambda - \gamma_{ii}$, we have
-    $$\log |\widetilde{\mathbf{W}}| - \log|\mathbf{W}| = \log \mu.$$
+    \begin{equation}\log |\widetilde{\mathbf{W}}| - \log|\mathbf{W}| = \log \mu.\end{equation}
     It can be shown as well from (\ref{eqn::elemblocktrans}) that 
-    $$\begin{aligned}
+    \begin{equation}\begin{aligned}
       \widetilde{\mathbf{W}}^{-1} &= \begin{bmatrix}
       \mathbf{I} & -\mathbf{W}^{-1}{\boldsymbol{z}}_{\cdot i}  \\ \boldsymbol{0}^\mathrm{T} & 1
     \end{bmatrix}\begin{bmatrix}
@@ -454,8 +553,8 @@ We tested the accuracy of both optimizations, and recorded the respective execut
       \mathbf{W}^{-1} + \mu^{-1}\mathbf{W}^{-1}\boldsymbol{z}_{i \cdot}{\boldsymbol{z}}_{\cdot i}^{\mathrm{T}}\mathbf{W}^{-1} & -\mu^{-1}\mathbf{W}^{-1}\boldsymbol{z}_{i \cdot} \\
       -\mu^{-1}\boldsymbol{z}_{i \cdot}^\mathrm{T}\mathbf{W}^{-1} & \mu^{-1}
     \end{bmatrix}.
-    \end{aligned}$$
-    Hence, $$
+    \end{aligned}\end{equation}
+    Hence, \begin{equation}
     \begin{aligned}
       \widetilde{\mathbf{\Gamma}} &= \begin{bmatrix}
         \mathbf{Z} & \boldsymbol{e}_i
@@ -467,26 +566,26 @@ We tested the accuracy of both optimizations, and recorded the respective execut
       &= \mathbf{\Gamma} + \mu^{-1}(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)^\mathrm{T}.
       \label{eqn::gammaupdate}
     \end{aligned}
-    $$
-    Therefore, the trace can be updated via $$
+  \end{equation}
+    Therefore, the trace can be updated via \begin{equation}
     \begin{aligned}
       \widetilde{t} - t &= \mathrm{tr}({\mathbf{X}}^{\mathrm{T}}(\mathbf{I} - \widetilde{\mathbf{\Gamma}})\mathbf{X}) - \mathrm{tr}({\mathbf{X}}^{\mathrm{T}}(\mathbf{I} - \mathbf{\Gamma})\mathbf{X}) \\
       &= \mathrm{tr}({\mathbf{X}}^{\mathrm{T}}(\mathbf{\Gamma} - \widetilde{\mathbf{\Gamma}})\mathbf{X}) \\
       &= -\mu^{-1}\mathrm{tr}({\mathbf{X}}^{\mathrm{T}}(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)^\mathrm{T}\mathbf{X}) \\
       &= -\mu^{-1}||{\mathbf{X}}^{\mathrm{T}}(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)||_2^2.
     \end{aligned}
-    $$
-    It is worthwhile to notice that to do not need calculating $\mathbf{W}$ and $\mathbf{\Gamma}$, as we do not care about constant terms in posterior probability. What we actually need is the ratio $$\frac{p(\mathbf{X}\mid \mathbf{Z}_{i,k}^{+},\sigma_X,\sigma_A)P(K_i^\text{new} = k\mid\alpha)}{p(\mathbf{X}\mid \mathbf{Z},\sigma_X,\sigma_A)P(K_i^\text{new} = 0\mid\alpha)} = \prod_{j = 0}^{k-1} \frac{p(\mathbf{X}\mid \mathbf{Z}_{i,j+1}^{+},\sigma_X,\sigma_A)P(K_i^\text{new} = j+1\mid\alpha)}{p(\mathbf{X}\mid \mathbf{Z}_{i,j}^{+},\sigma_X,\sigma_A)P(K_i^\text{new} = j\mid\alpha)},$$
+  \end{equation}
+    It is worthwhile to notice that to do not need calculating $\mathbf{W}$ and $\mathbf{\Gamma}$, as we do not care about constant terms in posterior probability. What we actually need is the ratio \begin{equation}\frac{p(\mathbf{X}\mid \mathbf{Z}_{i,k}^{+},\sigma_X,\sigma_A)P(K_i^\text{new} = k\mid\alpha)}{p(\mathbf{X}\mid \mathbf{Z},\sigma_X,\sigma_A)P(K_i^\text{new} = 0\mid\alpha)} = \prod_{j = 0}^{k-1} \frac{p(\mathbf{X}\mid \mathbf{Z}_{i,j+1}^{+},\sigma_X,\sigma_A)P(K_i^\text{new} = j+1\mid\alpha)}{p(\mathbf{X}\mid \mathbf{Z}_{i,j}^{+},\sigma_X,\sigma_A)P(K_i^\text{new} = j\mid\alpha)},\end{equation}
   or equivalently \begin{multline}\log p(\mathbf{X}\mid \mathbf{Z}_{i,j+1}^{+},\sigma_X,\sigma_A) - \log p(\mathbf{X}\mid \mathbf{Z}_{i,j}^{+},\sigma_X,\sigma_A) \\+ \log P(K_i^\text{new} = j+1\mid\alpha) - \log P(K_i^\text{new} = j\mid\alpha)
   \label{eqn::logdiff}
   \end{multline}
     for $j = 0, 1,\cdots, k-1$.
     In a recursive scheme, we can always view $\mathbf{Z}_{i,j}^+$ as baseline and $\mathbf{Z}_{i, j+1}^+$ is exactly adding a column $\boldsymbol{e}_i$ on the right of $\mathbf{Z}_{i,j}^+$.
 
-    Using the notations above, (\ref{eqn::logdiff}) can be evaluated as $$D\log \left(\frac{\sigma_X}{\sigma_A}\right) - \frac{D}{2}\log \mu + \frac{1}{2\sigma_X^2}\mu^{-1}||{\mathbf{X}}^{\mathrm{T}}(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)||_2^2.$$
+    Using the notations above, (\ref{eqn::logdiff}) can be evaluated as \begin{equation}D\log \left(\frac{\sigma_X}{\sigma_A}\right) - \frac{D}{2}\log \mu + \frac{1}{2\sigma_X^2}\mu^{-1}||{\mathbf{X}}^{\mathrm{T}}(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i)||_2^2.\end{equation}
 
     Recall that $\mu = 1 + \lambda - \gamma_{ii}$ which can be obtained from $\boldsymbol{\gamma}_{\cdot i}$. It suffices to show that $\widetilde{\boldsymbol{\gamma}}_{\cdot i}$ can be updated directly through $\boldsymbol{\gamma}_{\cdot i}$.
-    It immediately follows (\ref{eqn::gammaupdate}) that $$\widetilde{\boldsymbol{\gamma}}_{\cdot i} = \boldsymbol{\gamma}_{\cdot i} + \mu^{-1}(\gamma_{ii} - 1)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i).$$
+    It immediately follows (\ref{eqn::gammaupdate}) that \begin{equation}\widetilde{\boldsymbol{\gamma}}_{\cdot i} = \boldsymbol{\gamma}_{\cdot i} + \mu^{-1}(\gamma_{ii} - 1)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i).\end{equation}
 \end{appendices}
 
 \end{document}

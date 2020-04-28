@@ -248,7 +248,7 @@ class IBP:
     
     @staticmethod
     def wallRandomWalk(X, eps, wall = (None, None)):
-        new_X = np.random.uniform(X - eps, X + eps)
+        new_X = np.random.normal(X, eps)
         left, right = wall
         def walled(_):
             if left is not None and _ < left:
