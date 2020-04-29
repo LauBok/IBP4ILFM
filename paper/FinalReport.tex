@@ -92,11 +92,7 @@
 \maketitle
 
 \begin{abstract}
-  \textcolor{red}{The abstract paragraph should be indented \nicefrac{1}{2}~inch (3~picas) on
-  both the left- and right-hand margins. Use 10~point type, with a vertical
-  spacing (leading) of 11~points.  The word \textbf{Abstract} must be centered,
-  bold, and in point size 12. Two line spaces precede the abstract. The abstract
-  must be limited to one paragraph.}
+  The Indian Buffet Process is a generative process that results in a probability distribution over equivalence classes of binary matrices with an unbounded number of columns. This distribution is often used as a prior in infinite latent feature models where the objects are represented by a potentially infinite array of features. In this paper, we introduce an implementation on a Gibbs sampler for inference in this model, performed optimizations and correctness check, and applied it to simulated and real datasets. Comparison with existing algorithms shows that a noticeable gain in performance is achieved.
 \end{abstract}
 
 \section{Background}
@@ -180,7 +176,7 @@ For Gibbs sampler, we use a number in bracket to indicate a sample in a specific
   \KwIn{Number of iterations $T$, initial values of $\alpha^{(0)}$, $\sigma_X^{(0)}$, $\sigma_A^{(0)}$, and hypermeters $\alpha^a$, $\alpha^b$, $\sigma_X^a$, $\sigma_X^b$, $\sigma_A^a$, $\sigma_A^b$}
   \KwOut{Results of $\mathbf{Z}$, $\alpha$, $\sigma_X$, $\sigma_A$ in each iteration}
 
-  Sample $\mathbf{Z}^{(0)}$ from Indian buffet process\;
+  Sample $\mathbf{Z}^{(0)}$ from Indian buffet process (Appendix \ref{sec::IBP})\;
   \For{$t = 1$ to $T$}{
     \For{$i$ in randomized $1:N$}{
       \For{$k = 1$ to $K$}{
@@ -394,7 +390,22 @@ We tested the accuracy of both optimizations, and recorded the respective execut
 
 Gibbs samplers generate dependent samples from a Markov Chain. As the $n$-th iteration is based upon the $(n-1)$-th iteration, it is unlikely feasible to parallel the sampling process into multiple cores. Although matrix operations generally can be performed in parallel, \texttt{numpy} module is already highly optimized by utilizing cache memory and assembler implementation. Moreover, many architectures now enable BLAS to take advantage of a multicore machine. Thus, we did not optimize the code further through parallelism.
 \subsection{Optimization via C++}
-Most of \texttt{numpy} functions are implemented in C/C++, so there is little advantage of rewriting built-in functions in risk of numerical instability. However, we may reduce the interpretation time by ahead-of-time compilation (which can be done through modules, e.g. \texttt{numba}\citep{numba10.1145/2833157.2833162}), explicitly declaring variable types and turn off checks where safety is assured.
+ In many cases, the interpretation time in Python can be reduced by ahead-of-time compilation (which can be done through modules, e.g. \texttt{numba}\citep{numba10.1145/2833157.2833162}), explicitly declaring variable types and turn off checks where safety is assured. However, the precompiled version was unexpectedly slow. The reason might be that most of \texttt{numpy} functions are implemented in C/C++ and there is little advantage of rewriting built-in functions in risk of numerical instability (Table \ref{tbl::numba}). 
+
+ \begin{table}[!h]
+  \centering
+  \small
+  \caption{The execution time of three implementations of \texttt{lp} with $N = 1000$, $D = 400$ and $K = 200$ with $1000$ repetitions, shown in seconds and relative ratios.}
+  \label{tbl::numba}
+  \begin{tabular}{cccc}
+    \toprule
+    & Original Version & Improved Version & Numba Version \\
+    \midrule
+    Avg. & 0.029838s (1.000) & 0.015699s (0.526) & 0.156077s (5.231) \\
+    Max. & 0.126699s (1.000) & 0.069471s (0.548) & 0.428310s (3.381) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 
 \begin{figure}[!h]
@@ -470,12 +481,36 @@ We applied this Gibbs sampler on a dataset consisting of $1056\times 691$ pixel 
 
 Although it is hard to interprete all these latent features, it is delighting to see that the features are able to capture the symmetry in most card images and reveal some particular patterns. For example, feature 1 (excluding the mean image) captures the pattern of a diamond in the center (light) with no diamonds in the corners (dark), which is shared by A$\blacklozenge$ and 3$\blacklozenge$. It is also interesting to note some enhancing-declining pairs in these features. Feature 7 and 8 have opposite effects, as a dark diamond in the center removes it from 4$\blacklozenge$ and a light one enhances it on 5$\blacklozenge$. Similarly goes for feature 3 through 5. These features demonstrate a pattern of two diamonds vertically arranged in the middle. Feature 3 declines both diamonds while feature 5 enhances them. Feature 4, which has both a light and a dark diamond, enhances the one on the top and declines the other at the bottom. These features contribute to the difference among 6$\blacklozenge$, 7$\blacklozenge$ and 8$\blacklozenge$.
 
+
+
 \section{Comparative Analysis}\label{sec::comparison}
-Feature extraction, which involves reduceing the dimensionality of original data, plays a significant role in data analysis. Through feature extraction, data in high dimensionality are embedded into a low dimension space while still being described with sufficient accuracy. Many feature extraction techniques have been proposed, from traditional methods on low-rank matrix approximation (e.g. PCA) to neural network based algorithms (e.g. autoencoder). A majority of these methods, however, requires predetermined hyperparameters controlling the number of features. On the poker card dataset, principal component analysis (PCA) requires 49 features to maintain information akin to our method (measured in variance). Although as few as $8$ components are sufficient to reconstruct the images with differences imperceptable to human eyes, determination on this number requires domain knowledge. Our methods extracted $14$ features without manual selection, which is slightly more redundant than $8$. However, it outperforms much over $49$ features suggested by PCA comparably in absense of manual selection.
+Feature extraction, which involves reducing the dimensionality of original data, plays a significant role in data analysis. Through feature extraction, data in high dimensionality are embedded into a low dimension space while still being described with sufficient accuracy. Many feature extraction techniques have been proposed, from traditional methods on low-rank matrix approximation (e.g. PCA) to neural network based algorithms (e.g. autoencoder). A majority of these methods, however, requires predetermined hyperparameters controlling the number of features. On the poker card dataset, principal component analysis (PCA) requires 49 features to maintain information akin to our method (measured in variance). Although as few as $8$ components are sufficient to reconstruct the images with differences imperceptable to human eyes, determination on this number requires domain knowledge. Our methods extracted $14$ features without manual selection, which is slightly more redundant than $8$. However, it outperforms much over $49$ features suggested by PCA comparably in absense of manual selection.
 
-Some other implementations can be found on the same algorithm as introduced in this paper, one of which is given by \citet{chai}. The authors of that implementation was able to reduce the running time by utilizing the one-rank update of matrix inversion \citep{griffiths2005infinite}, they failed to exploit sufficiently for potential speedup possibility. Another implementation is from an opensource repository \texttt{PyIBP} \citep{davidandrjez}.
+Some other implementations can be found on the same algorithm as introduced in this paper, one of which is given by \citet{chai}. The authors of that implementation was able to reduce the running time by utilizing the one-rank update of matrix inversion \citep{griffiths2005infinite}, they failed to exploit sufficiently for potential speedup possibility. Furthermore, the code was not written in OOP (object oriented programming), nor was it well wrapped for reproduction.
 
-The execution time of these implementations was recorded respectively under the same dataset. The profiling information is given in Table \textcolor{red}{xx}.
+The execution time of these implementations was recorded respectively under the same dataset. The profiling information is given in Table \ref{tbl::cmp}.
+
+\begin{table}[!h]
+  \centering
+  \small
+  \caption{Profile on simulated data introduced in Section \ref{sec::simulation}}
+  \label{tbl::cmp}
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    & \multicolumn{3}{c}{Implementation of \citet{chai}} & \multicolumn{3}{c}{Our implementation} \\
+    & \multicolumn{1}{c}{Total time}& \multicolumn{1}{c}{\# Exec} & \multicolumn{1}{c}{Avg. time} & \multicolumn{1}{c}{Total time}& \multicolumn{1}{c}{\# Exec} & \multicolumn{1}{c}{Avg. time} \\
+    & \multicolumn{1}{c}{\scriptsize(sec)} & \multicolumn{1}{c}{} & \multicolumn{1}{c}{\scriptsize($\mu$sec)} & \multicolumn{1}{c}{\scriptsize(sec)} & \multicolumn{1}{c}{} & \multicolumn{1}{c}{\scriptsize($\mu$sec)} \\
+    \midrule
+    Sample $\mathbf{Z}$ & 450.754 & 970,000 & 464.694 & 140.783 & 490,218 & 287.184 \\
+    Sample $K$ & 82.614 & 97,000 & 851.690 & 21.080 & 97,000 & 217.319 \\
+    Sample $\alpha$ & 0.140 & 1,000 & 139.871 & 0.028 & 1,000 & 28.423\\
+    Sample $\sigma_X$ & 0.348 & 1,000 & 347.566 & 0.248 & 1,000 & 248.225\\
+    Sample $\sigma_A$ & 0.331 & 1,000 & 331.169 & 0.221 & 1,000 & 221.456\\
+    Others & 2.386 & --------- & --------- & 1.821 & --------- & ---------\\
+    Total & 536.572 & --------- & --------- & 164.182 & --------- & ---------\\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \section{Discussion}\label{sec::discussion}
 We have demonstrated that our implementation of the algorithm proposed by \citet{griffiths2005infinite} achieved satisfactory accuracy and efficiency. Also, we applied the algorithm on datasets where the observations are exchangeable and each observation possesses a finite subset of infinite latent features, and obtained reasonable and interpretable results. The strategy of taking the limit of a finite model from latent classes to infinite features provides a direction for a wild class of latent structures, such as in \citet{teh2006hierarchical} and \citet{chen2011hierarchical}.
@@ -487,6 +522,32 @@ Although the algorithm we implemented upon extended the models from definite lat
 
 \newpage
 \begin{appendices}
+  \section{The Indian buffet process}\label{sec::IBP}
+  The Indian buffet process is a metaphor of Indian restaurant which generates a probability distribution on equivalence classes of binary matrices. Assume that the restaurant offers a buffet with infinite number of dishes, and a finite number $N$ of customers enter this restaurant sequentially. Each customer $i$ moves along the buffet and samples each dish $k$ with a probability of $m_k/i$, where $m_k$ is the number of previous customers who have sampled that dish. Then, the $i$-th customer tries a number of new dishes, randomly drawn from a Possion$(\alpha / i)$ distribution. The indicator matrix, the $(i,j)$-th entry showing whether the customer $i$ chose dish $j$, is a binary matrix from that distribution. It deserves attention that the distribution generated from Indian buffet process is actually exchangeable, although the customers enter in a certain order, because the numbering of the dishes can be arbitrarily permutated.
+
+  The algorithm for sampling from the Indian buffet process is provided in Algorithm \ref{tbl::IBP}.
+ 
+  \begin{algorithm}
+    \caption{Sampling scheme from an Indian buffet process}
+    \label{tbl::IBP}
+    \KwIn{The number of rows $N$, parameter $\alpha$}
+    \KwOut{A binary matrix $\mathbf{Z}$}
+    Initialize $\mathbf{Z} = \mathbf{0}_{N\times 0}$, $\boldsymbol{c} = []$, $n = 0$\;
+    \For{$i$ in permutated rows of $\mathbf{Z}$}{
+      $n$++\;
+      \For{$j$ in columns of $\mathbf{Z}$}{
+        $u$ = sample $\mathbf{Z}[i,j]$ with probability $\boldsymbol{c}[j]/n$\;
+        \If{$u == 1$}{
+          $\boldsymbol{c}[j]$++\;
+        }
+        $k$ = sample from Possion$(\alpha/n)$\;
+        append $\boldsymbol{c}$ with $k$ $1$'s\;
+        right-append $\mathbf{Z}$ with $k$ columns with row $i$ being all $1$'s\;
+      }
+
+    }
+  \end{algorithm}
+
   \section{Auxillary proofs}
   \subsection{Proof of calculating the conditional likelihood}\label{app::proof1}
     Assume $\mathbf{Z}$ is an $M\times K$ matrix and $M\gg K$. Denote $\lambda = \sigma_X^2 / \sigma_A^2$.

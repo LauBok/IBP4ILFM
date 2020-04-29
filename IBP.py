@@ -3,6 +3,7 @@ from tqdm import tqdm,trange
 import random
 import sys
 import sympy 
+import time
 
 class IBP:
     def __init__(self, X, Z = None, sigma_X = 1, sigma_A = 1, alpha = 1):
@@ -11,6 +12,13 @@ class IBP:
         self.sigma_X = sigma_X
         self.sigma_A = sigma_A
         self.trX = np.trace(self.X.T @ self.X)
+        self.time_Z = [0, 0]
+        self.time_K = [0, 0]
+        self.time_alpha = [0,0]
+        self.time_sigma_X = [0,0]
+        self.time_sigma_A = [0,0]
+        self.time_simplify = [0,0]
+        self.time_total = 0
         if type(alpha) is tuple:
             self.alpha, self.alpha_a, self.alpha_b = alpha
             self.alpha_update = True
@@ -52,6 +60,7 @@ class IBP:
         assert(len(K) == Z.shape[1])
     
     def MCMC(self, maxiter = 1000):
+        _t = time.time()
         history = {
             'Z': [None] * maxiter, 
             'K': np.zeros(maxiter),
@@ -69,19 +78,35 @@ class IBP:
                 history['alpha'][it] = self.alpha
                 pbar.set_description("Current K = %s" % self.K)
                 pbar.update(1)
+        self.time_total = time.time() - _t
         return history
     
     def step(self):
         for i in random.sample(range(self.N), self.N):
             self.sampleZ(i)
+            _t = time.time()
             self.sampleK(i)
-        self.simplify()
+            self.time_K[0] += time.time() - _t
+            self.time_K[1] += 1
+        _t = time.time()
+        # self.simplify()
+        self.time_simplify[0] += time.time() - _t
+        self.time_simplify[1] += 1
+        _t = time.time()
         if self.alpha_update:
             self.sampleAlpha()
+        self.time_alpha[0] += time.time() - _t
+        self.time_alpha[1] += 1
+        _t = time.time()
         if self.sigma_X_update:
             self.sampleSigmaX()
+        self.time_sigma_X[0] += time.time() - _t
+        self.time_sigma_X[1] += 1
+        _t = time.time()
         if self.sigma_A_update:
             self.sampleSigmaA()
+        self.time_sigma_A[0] += time.time() - _t
+        self.time_sigma_A[1] += 1
     
     def simplify(self):
         _, inds = sympy.Matrix(self.Z).rref()
@@ -128,8 +153,11 @@ class IBP:
 
     def sampleZ(self, i):
         for k in range(self.K):
+            # timing
+            _t = time.time()
             self._sampleZ(i, k)
-        
+            self.time_Z[0] += time.time() - _t
+            self.time_Z[1] += 1
     def _sampleZ(self, i, k):
         # Use formula (9) to update Z_{ik}
         mk = sum(self.Z[:, k]) - self.Z[i, k]
@@ -217,6 +245,16 @@ class IBP:
 
     def postMean(self):
         return np.linalg.inv(self.Z.T @ self.Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(self.K)) @ self.Z.T @ self.X
+
+    def profile(self):
+        print(f"Total time used: {self.time_total}s")
+        print(f"Update Z\ttot_time {self.time_Z[0]}s\t#exec {self.time_Z[1]}\tavg_time {self.time_Z[0]/self.time_Z[1]}s")
+        print(f"Update K\ttot_time {self.time_K[0]}s\t#exec {self.time_K[1]}\tavg_time {self.time_K[0]/self.time_K[1]}s")
+        print(f"Update alpha\ttot_time {self.time_alpha[0]}s\t#exec {self.time_alpha[1]}\tavg_time {self.time_alpha[0]/self.time_alpha[1]}s")
+        print(f"Update sigma_X\ttot_time {self.time_sigma_X[0]}s\t#exec {self.time_sigma_X[1]}\tavg_time {self.time_sigma_X[0]/self.time_sigma_X[1]}s")
+        print(f"Update sigma_A\ttot_time {self.time_sigma_A[0]}s\t#exec {self.time_sigma_A[1]}\tavg_time {self.time_sigma_A[0]/self.time_sigma_A[1]}s")
+        print(f"Other\t\ttot_time {self.time_total - self.time_Z[0] - self.time_K[0] - self.time_alpha[0] - self.time_sigma_X[0] - self.time_sigma_A[0]}s")
+        return [self.time_Z, self.time_K, self.time_alpha, self.time_sigma_X, self.time_sigma_A, self.time_total]
 
     @staticmethod
     def binary(p, type = None):
