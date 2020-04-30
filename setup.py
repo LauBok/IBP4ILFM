@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="IBP4ILFM", 
-    version="0.0.1",
+    version="0.1a",
     author="Bo Liu & Linlin Li",
     author_email="bl226@duke.edu",
     description="Bayesian Infinite Latent Feature Models and IBP",

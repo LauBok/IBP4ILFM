@@ -1,1 +1,2 @@
-from IBP4ILFM import IBP
+import sys
+sys.path.append('..')
