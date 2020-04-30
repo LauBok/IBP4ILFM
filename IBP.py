@@ -1,17 +1,66 @@
+"""
+IBP
+
+Gibbs sampling for linear Gaussian infinite latent feature model (IBP).
+"""
+
 import numpy as np
-from tqdm import tqdm,trange
+from tqdm import tqdm, trange
 import random
 import sys
 import sympy 
 import time
 
 class IBP:
+    """Gibbs sampling for linear Gaussian infinite latent feature model (IBP). """
+    
     def __init__(self, X, Z = None, sigma_X = 1, sigma_A = 1, alpha = 1):
+        """ 
+        X = NxD numpy observation matrix (should be centered)
+        sigma_X = Fixed noise std OR (init,a,b) tuple where (a,b) are inverse-Gamma hyperprior shape and rate/inverse scale
+        sigma_A = Fixed weight std OR (init,a,b) tuple (same as sigma_X)
+        alpha = Fixed IBP hyperparam for OR (init,a,b) tuple where (a,b) are Gamma hyperprior shape and rate/inverse scale
+        """
+        
+        # data matrix
         self.X = X
         self.N, self.D = X.shape
-        self.sigma_X = sigma_X
-        self.sigma_A = sigma_A
         self.trX = np.trace(self.X.T @ self.X)
+        
+        # noise variance hyperparameter
+        self.sigma_X = sigma_X
+        if type(sigma_X) is tuple:
+            self.sigma_X, self.sigma_X_a, self.sigma_X_b = sigma_X
+            self.sigma_X_update = True
+        else:
+            self.sigma_X = sigma_X
+            self.sigma_X_update = False
+           
+        # weight variance hyperparameter
+        self.sigma_A = sigma_A
+        if type(sigma_A) is tuple:
+            self.sigma_A, self.sigma_A_a, self.sigma_A_b = sigma_A
+            self.sigma_A_update = True
+        else:
+            self.sigma_A = sigma_A
+            self.sigma_A_update = False
+            
+        # IBP hyperparameter
+        if type(alpha) is tuple:
+            self.alpha, self.alpha_a, self.alpha_b = alpha
+            self.alpha_update = True
+        else:
+            self.alpha = alpha
+            self.alpha_update = False
+        
+        # initialze Z from IBP(alpha) and calculate K
+        if Z is None:
+            self.initZ()
+        else:
+            assert(self.N == Z.shape[0])
+            self.Z = Z
+            self.K = Z.shape[1]
+            
         self.time_Z = [0, 0]
         self.time_K = [0, 0]
         self.time_alpha = [0,0]
@@ -19,40 +68,20 @@ class IBP:
         self.time_sigma_A = [0,0]
         self.time_simplify = [0,0]
         self.time_total = 0
-        if type(alpha) is tuple:
-            self.alpha, self.alpha_a, self.alpha_b = alpha
-            self.alpha_update = True
-        else:
-            self.alpha = alpha
-            self.alpha_update = False
-        if type(sigma_X) is tuple:
-            self.sigma_X, self.sigma_X_a, self.sigma_X_b = sigma_X
-            self.sigma_X_update = True
-        else:
-            self.sigma_X = sigma_X
-            self.sigma_X_update = False
-        if type(sigma_A) is tuple:
-            self.sigma_A, self.sigma_A_a, self.sigma_A_b = sigma_A
-            self.sigma_A_update = True
-        else:
-            self.sigma_A = sigma_A
-            self.sigma_A_update = False
-        if Z is None:
-            self.initZ()
-        else:
-            assert(self.N == Z.shape[0])
-            self.Z = Z
-            self.K = Z.shape[1]
-
+     
     def initZ(self):
+        """ Initial latent features Z from IBP(alpha) and calculate K. """
         Z = np.zeros((self.N, 0))
         K = []
         for i in range(self.N):
             # the i-th customer
             for k, nk in enumerate(K):
+                # sample existing features
                 Z[i, k] = IBP.binary(nk / (i + 1))
+            # sample new features
             K_new = np.random.poisson(self.alpha / (i + 1))
             K += [1] * K_new
+            # add to Z matrix
             Z = IBP.append(Z, i, K_new)
         ## initialize self.Z and update self.K
         self.Z = Z
@@ -60,6 +89,7 @@ class IBP:
         assert(len(K) == Z.shape[1])
     
     def MCMC(self, maxiter = 1000):
+        """ Gibbs sampler. """
         _t = time.time()
         history = {
             'Z': [None] * maxiter, 
@@ -82,11 +112,14 @@ class IBP:
         return history
     
     def step(self):
+        """ Update Z, K, sigma_X, sigma_A, and alpha from posterior. """
         for i in random.sample(range(self.N), self.N):
             self.sampleZ(i)
             _t = time.time()
             self.sampleK(i)
+            # record the time on sampling K
             self.time_K[0] += time.time() - _t
+            # record the number of sampling K
             self.time_K[1] += 1
         _t = time.time()
         # self.simplify()
@@ -95,26 +128,34 @@ class IBP:
         _t = time.time()
         if self.alpha_update:
             self.sampleAlpha()
+        # record the time on sampling alpha
         self.time_alpha[0] += time.time() - _t
+        # record the number of sampling alpha
         self.time_alpha[1] += 1
         _t = time.time()
         if self.sigma_X_update:
             self.sampleSigmaX()
+        # record the time on sampling sigma_X
         self.time_sigma_X[0] += time.time() - _t
+        # record the number of sampling sigma_X
         self.time_sigma_X[1] += 1
         _t = time.time()
         if self.sigma_A_update:
             self.sampleSigmaA()
+        # record the time on sampling sigma_A
         self.time_sigma_A[0] += time.time() - _t
+        # record the number of sampling sigma_A
         self.time_sigma_A[1] += 1
     
     def simplify(self):
+        """ Remove linear dependent column. """
         _, inds = sympy.Matrix(self.Z).rref()
         self.Z = self.Z[:, inds]
         self.K = self.Z.shape[1]
         return self
 
     def _lp_original(self, Z = None, sigma_X = None, sigma_A = None):
+        """ The original version of calculating log-likelihood p(X|Z, sigma_X, sigma_A). """
         if Z is None:
             Z = self.Z
         if sigma_X is None:
@@ -131,6 +172,7 @@ class IBP:
         return res
         
     def lp(self, Z = None, sigma_X = None, sigma_A = None):
+        """ The faster version of calculating log-likelihood p(X|Z, sigma_X, sigma_A). """
         if Z is None:
             Z = self.Z
         if sigma_X is None:
@@ -152,6 +194,7 @@ class IBP:
         return res
 
     def sampleZ(self, i):
+        """ Sample Z_{i} using loop for each k. """
         for k in range(self.K):
             # timing
             _t = time.time()
@@ -159,7 +202,7 @@ class IBP:
             self.time_Z[0] += time.time() - _t
             self.time_Z[1] += 1
     def _sampleZ(self, i, k):
-        # Use formula (9) to update Z_{ik}
+        """ Sample Z_{ik} using formula (9). """
         mk = sum(self.Z[:, k]) - self.Z[i, k]
         ## The column only has this non-zero entry.
         if mk == 0:
@@ -173,6 +216,7 @@ class IBP:
             self.Z[i, k] = IBP.binary(logpratio, "logdiff")
 
     def sampleK(self, i, log_thres = -16):
+        """ The faster version of sampling K_new from IBP and update K. """
         log_prob = np.array([0])
         lmd = self.alpha / self.N
         e = np.zeros(self.Z.shape[0])
@@ -204,6 +248,7 @@ class IBP:
         self.K = self.Z.shape[1]
         
     def _sampleK_original(self, i, log_thres = -16):
+        """ The original version of sampling K_new from IBP and update K. """
         log_prob = np.array([])
         K_new = 0
         lmd = self.alpha / self.N
@@ -225,9 +270,11 @@ class IBP:
         self.K = self.Z.shape[1]
     
     def sampleAlpha(self):
+        """ Sample alpha from conjugate posterior. """
         self.alpha = np.random.gamma(self.alpha_a + self.K, self.alpha_b + np.sum(1/np.arange(1, self.N + 1)))
 
     def sampleSigmaX(self, epsilon = 0.01):
+        """ Sample noise variances. """
         new_sigma_X = IBP.wallRandomWalk(self.sigma_X, epsilon, wall = (0, None))
         log_p = (-self.sigma_X_a - 1) * (np.log(new_sigma_X) - np.log(self.sigma_X))
         log_p -= self.sigma_X_b * (1/new_sigma_X - 1/self.sigma_X)
@@ -236,6 +283,7 @@ class IBP:
             self.sigma_X = new_sigma_X
     
     def sampleSigmaA(self, epsilon = 0.01):
+        """ Sample feature variances. """
         new_sigma_A = IBP.wallRandomWalk(self.sigma_A, epsilon, wall = (0, None))
         log_p = (-self.sigma_A_a - 1) * (np.log(new_sigma_A) - np.log(self.sigma_A))
         log_p -= self.sigma_A_b * (1/new_sigma_A - 1/self.sigma_A)
@@ -244,9 +292,11 @@ class IBP:
             self.sigma_A = new_sigma_A
 
     def postMean(self):
+        """ Calculate E[A|X,Z]. """
         return np.linalg.inv(self.Z.T @ self.Z + self.sigma_X**2 / self.sigma_A**2 * np.eye(self.K)) @ self.Z.T @ self.X
 
     def profile(self):
+        """ Calculate the time and number of each function. """
         print(f"Total time used: {self.time_total}s")
         print(f"Update Z\ttot_time {self.time_Z[0]}s\t#exec {self.time_Z[1]}\tavg_time {self.time_Z[0]/self.time_Z[1]}s")
         print(f"Update K\ttot_time {self.time_K[0]}s\t#exec {self.time_K[1]}\tavg_time {self.time_K[0]/self.time_K[1]}s")
@@ -258,26 +308,29 @@ class IBP:
 
     @staticmethod
     def binary(p, type = None):
+        """ Sample from Bernoulli distribution. """
         if type == 'log':
-            if p > 0:
+            if p > 0: ## avoid overflow
                 return 1
-            elif p < -200:
+            elif p < -200: ## avoid underflow
                 return 0
             p = np.exp(p)
         elif type == 'logdiff':
-            if p > 200:
+            if p > 200: ## avoid overflow
                 return 1
-            elif p < -200:
+            elif p < -200:  ## avoid underflow
                 return 0
             p = np.exp(p) / (1 + np.exp(p))
         return np.random.random() < p
     
     @staticmethod
     def copy(mat):
+        """ Make a copy for safety reasons. """
         return mat + 0
 
     @staticmethod
     def append(Z, i, K_new):
+        """ Add K_new 1s to the i-th row of Z. """
         N, K = Z.shape
         _Z = np.zeros((N, K + K_new))
         _Z[:, :K] = Z
@@ -286,14 +339,17 @@ class IBP:
     
     @staticmethod
     def wallRandomWalk(X, eps, wall = (None, None)):
+        """ Bounded random walk on two sides. """
         new_X = np.random.normal(X, eps)
         left, right = wall
         def walled(_):
+            """ If it hits a wall, it will bounce. """
             if left is not None and _ < left:
                 return walled(2 * left - _)
             if right is not None and _ > right:
                 return walled(2 * right - _)
             return _
         return walled(new_X)
+
 
 
