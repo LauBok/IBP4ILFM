@@ -92,8 +92,10 @@
 \maketitle
 
 \begin{abstract}
-  The Indian Buffet Process is a generative process that results in a probability distribution over equivalence classes of binary matrices with an unbounded number of columns. This distribution is often used as a prior in infinite latent feature models where the objects are represented by a potentially infinite array of features. In this paper, we introduce an implementation on a Gibbs sampler for inference in this model, performed optimizations and correctness check, and applied it to simulated and real datasets. Comparison with existing algorithms shows that a noticeable gain in performance is achieved.
+  The Indian buffet process is a generative process that results in a probability distribution over equivalence classes of binary matrices with an unbounded number of columns. This distribution is often used as a prior in infinite latent feature models where the objects are represented by a potentially infinite array of features. In this paper, we introduce an implementation on a Gibbs sampler for inference in this model, perform optimizations and correctness check, and apply it to simulated and real datasets. Comparison with existing algorithms shows that a noticeable gain in performance is achieved.
 \end{abstract}
+
+\paragraph{Key words:} Indian buffet process, binary matrix, infinite latent feature model, Gibbs sampler.
 
 \section{Background}
 
@@ -412,28 +414,28 @@ Gibbs samplers generate dependent samples from a Markov Chain. As the $n$-th ite
   \centering
   \begin{subfigure}[b]{\textwidth}
     \centering
-    \includegraphics[width = 9.5cm]{tetris.png}
+    \includegraphics[width = 9.5cm]{figures/tetris.png}
     \caption{Basic tetris-like patterns}
     \label{fig::tetris}
   \end{subfigure}
   \begin{subfigure}[b]{\textwidth}
     \centering
-    \includegraphics[width = 9.5cm]{tetrisfeature.png}
+    \includegraphics[width = 9.5cm]{figures/tetrisfeature.png}
     \caption{Features extracted from the data}
     \label{fig::tetrisfeature}
   \end{subfigure}
   \begin{subfigure}[b]{\textwidth}
     \centering
-    \includegraphics[width = 9.5cm]{tetrisdetection.png}
+    \includegraphics[width = 9.5cm]{figures/tetrisdetection.png}
     \caption{Features detected in images} 
     \label{fig::tetrisfeature}
   \end{subfigure}
-  \caption{(b) Results of extracted features from the Gibbs sampler. These features perfectly coincide with the basic patterns, ignoring background noise. (c) Ten images are randomly selected and the labels corresponds to latent features detected from the Gibbs sampler.}
+  \caption{(b) Results of extracted features from the Gibbs sampler. These features perfectly coincide with the basic patterns, ignoring background noise. (c) Ten images are randomly selected and the labels correspond to latent features detected from the Gibbs sampler.}
 \end{figure}
 
 \begin{figure}[!h]
   \centering
-  \includegraphics[width = \textwidth]{gibbsresultblock.png}
+  \includegraphics[width = \textwidth]{figures/gibbsresultblock.png}
   \caption{Trace plots for the dimensionality and parameters over $1000$ iterations of sampling. The posterior estimation of $\sigma_X = 0.0996$ is quite close to the true value $0.1$.}
   \label{fig::gibbsblock}
 \end{figure}
@@ -453,12 +455,12 @@ We applied this Gibbs sampler on a dataset consisting of $1056\times 691$ pixel 
   \centering
   \begin{subfigure}[b]{0.35\textwidth}
     \centering
-    \includegraphics[width = 2.75cm]{sample_original.png}
+    \includegraphics[width = 2.75cm]{figures/sample_original.png}
     \caption{Original image}
   \end{subfigure} 
   \begin{subfigure}[b]{0.35\textwidth}
     \centering
-    \includegraphics[width = 2.3cm]{sample_cropped.png}
+    \includegraphics[width = 2.3cm]{figures/sample_cropped.png}
     \caption{Processed image}
   \end{subfigure}
   \caption{The original and processed image of ten of diamonds (10$\blacklozenge$)}
@@ -467,15 +469,15 @@ We applied this Gibbs sampler on a dataset consisting of $1056\times 691$ pixel 
 
 \begin{figure}[!h]
   \centering
-  \includegraphics[width = \textwidth]{gibbsresult.png}
+  \includegraphics[width = \textwidth]{figures/gibbsresult.png}
   \caption{Trace plots for the dimensionality and parameters over $300$ iterations of sampling.}
   \label{fig::gibbs}
 \end{figure}
 
 \begin{figure}[!h]
   \centering
-  \includegraphics[width = \textwidth]{featuremap.png} 
-  \caption{Feature matrix in the left-ordered form. The mean image (left) and $14$ features are shown on the top. The left-most column are the images for the first suit of cards, and the images reconstructed from the features are displayed on the right respectively. The rectangles in the middle indicates which features are possessed by the images, with colored rectangles showing possession and the gray ones showing non-possession. The shades of color indicate the frequency of that feature being possessed. Both indicators and the reconstructed images are based upon the 300th sample.}
+  \includegraphics[width = \textwidth]{figures/featuremap.png} 
+  \caption{Feature matrix in the left-ordered form. The mean image (left) and $14$ features are shown on the top. In the left-most column are the images for the first suit of cards, and the images reconstructed from the features are displayed on the right respectively. The rectangles in the middle indicate which features are possessed by the images, with colored rectangles showing possession and the gray ones showing non-possession. The shades of color indicate the frequency of that feature being possessed. Both indicators and the reconstructed images are based upon the 300th sample.}
   \label{fig::featuremap}
 \end{figure}
 
