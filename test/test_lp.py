@@ -65,10 +65,6 @@ def lp_numba(trX, X, Z = None, sigma_X = None, sigma_A = None):
 
 def test_lp(func1, func2, func3, N, D, K, times, sigma_X = None, sigma_A = None):
     assert(D >= K)
-    if sigma_X is None:
-        sigma_X = 1
-    if sigma_A is None:
-        sigma_A = 1
     diff = np.zeros(times)
     diff[:] = np.nan
     time_arr = np.zeros((3, times))
@@ -77,20 +73,31 @@ def test_lp(func1, func2, func3, N, D, K, times, sigma_X = None, sigma_A = None)
             X = np.random.normal(0, 1, (N, D))
             Z = np.random.randint(0, 1, (N, K)) 
             Z = Z.astype('float')
+            if sigma_X is None:
+                sigma_X = np.random.random()
+            if sigma_A is None:
+                sigma_A = np.random.random()
             trX = np.trace(X.T @ X)
             time_start = time.time()
-            ans1 = func1(trX = trX, X = X, Z = Z, sigma_X = 1, sigma_A = 1)
+            ans1 = func1(trX = trX, X = X, Z = Z, sigma_X = sigma_X, sigma_A = sigma_A)
             time_arr[0, i] = time.time() - time_start
             time_start = time.time()
-            ans2 = func2(trX = trX, X = X, Z = Z, sigma_X = 1, sigma_A = 1)
+            ans2 = func2(trX = trX, X = X, Z = Z, sigma_X = sigma_X, sigma_A = sigma_A)
             time_arr[1, i] = time.time() - time_start
             time_start = time.time()
-            ans3 = func3(trX = trX, X = X, Z = Z, sigma_X = 1, sigma_A = 1)
+            ans3 = func3(trX = trX, X = X, Z = Z, sigma_X = sigma_X, sigma_A = sigma_A)
             time_arr[2, i] = time.time() - time_start
             diff[i] = max(np.abs(ans2 - ans1), np.abs(ans3 - ans1), np.abs(ans3 - ans2))
             pbar.update(1)
     
     return np.max(diff), np.mean(time_arr, axis = 1), np.max(time_arr, axis = 1)
+
+def _print(diff):
+    print("Maximum discrepancy:", format(diff[0], '.3e'))
+    print("lp-test".rjust(8), "original".rjust(10), "improved".rjust(10), "numba".rjust(10))
+    print("Mean.".rjust(8), format(diff[1][0], '.3e').rjust(10), format(diff[1][1], '.3e').rjust(10), format(diff[1][2], '.3e').rjust(10))
+    print("Max.".rjust(8), format(diff[2][0], '.3e').rjust(10), format(diff[2][1], '.3e').rjust(10), format(diff[2][2], '.3e').rjust(10))
+
 
 if __name__ == "__main__":
     opts, args = getopt.getopt(sys.argv[1:], "N:D:K:T:", ["sigma_X=","sigma_A="])
@@ -110,7 +117,4 @@ if __name__ == "__main__":
         elif opt in ("--sigma_A"):
             sigma_A = float(arg)
     diff = test_lp(lp_original, lp, lp_numba, N, D, K, T, sigma_X, sigma_A)
-    print("Maximum discrepancy:", format(diff[0], '.3e'))
-    print("lp-test".rjust(8), "original".rjust(10), "improved".rjust(10), "numba".rjust(10))
-    print("Mean.".rjust(8), format(diff[1][0], '.3e').rjust(10), format(diff[1][1], '.3e').rjust(10), format(diff[1][2], '.3e').rjust(10))
-    print("Max.".rjust(8), format(diff[2][0], '.3e').rjust(10), format(diff[2][1], '.3e').rjust(10), format(diff[2][2], '.3e').rjust(10))
+    print(diff)
