@@ -2,17 +2,18 @@ import setuptools
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
-
+exec(open('ibp/version.py').read())
 setuptools.setup(
-    name="IBP4ILFM", 
-    version="0.1a",
+    name="IBPILFM", 
+    version=__versionnum__,
     author="Bo Liu & Linlin Li",
     author_email="bl226@duke.edu",
     description="Bayesian Infinite Latent Feature Models and IBP",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/LauBok/IBP4ILFM",
-    packages=setuptools.find_packages(),
+    packages=['IBP','IBP.test'],
+    package_dir={'IBP': 'ibp', 'IBP.test': 'ibp/test'},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",

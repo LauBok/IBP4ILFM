@@ -14,6 +14,7 @@
 % to compile a camera-ready version, add the [final] option, e.g.:
 \usepackage[final]{finalreport} 
 \usepackage{xcolor}
+\usepackage{enumitem}
 % to avoid loading the natbib package, add option nonatbib:
 %     \usepackage[nonatbib]{neurips_2019}
 
@@ -33,6 +34,9 @@
 \usepackage[ruled,linesnumbered]{algorithm2e}
 \usepackage{multirow}
 \usepackage[toc,page]{appendix}
+
+\newcommand{\shellcmd}[1]{\\\indent\indent\texttt{\footnotesize\$ #1}\\}
+\newcommand{\pythoncmd}[1]{\\\indent\indent\texttt{\footnotesize>{}>{}> #1}\\}
 
 \usepackage{xcolor}
 \hypersetup{
@@ -86,6 +90,7 @@
   % Address \\
   % \texttt{email} \\
 }
+
 
 \begin{document}
 
@@ -649,6 +654,38 @@ Although the algorithm we implemented upon extended the models from definite lat
 
     Recall that $\mu = 1 + \lambda - \gamma_{ii}$ which can be obtained from $\boldsymbol{\gamma}_{\cdot i}$. It suffices to show that $\widetilde{\boldsymbol{\gamma}}_{\cdot i}$ can be updated directly through $\boldsymbol{\gamma}_{\cdot i}$.
     It immediately follows (\ref{eqn::gammaupdate}) that \begin{equation}\widetilde{\boldsymbol{\gamma}}_{\cdot i} = \boldsymbol{\gamma}_{\cdot i} + \mu^{-1}(\gamma_{ii} - 1)(\boldsymbol{\gamma}_{\cdot i} - \boldsymbol{e}_i).\end{equation}
+  \section{Package Installation}
+      The implemented package, \textbf{IBPILFM}\citep{bolin}, can be downloaded and installed via \texttt{pip}.
+      \vspace{0.3cm}
+      \shellcmd{pip install -i https://test.pypi.org/simple/ IBPILFM\vspace{0.3cm}}
+      To upgrade, run following codes in terminal. (The latest version is \texttt{0.1a4} as for Apr 30, 2020.)
+      \vspace{0.3cm}
+      \shellcmd{pip install -{}-upgrade -i https://test.pypi.org/simple/ IBPILFM\vspace{0.3cm}}
+      You can check the status of installation via
+      \vspace{0.3cm}
+      \shellcmd{python\vspace{0.3cm}}
+      and in python interactive shell, run
+      \vspace{0.3cm}
+      \pythoncmd{import ibp\\>{}>{}>{} ibp.\_\_version\_\_\vspace{0.3cm}}
+      The package is successfully installed if version is displayed (e.g. \texttt{'ibp-0.1a4'}).
+
+  \section{Collaborators}
+      
+      \textbf{Bo Liu}, Master's in Statistical Science, Duke University.
+      \begin{itemize}[leftmargin = 7mm]
+        \item[--] Author of the package
+        \item[--] Mathematical derivations
+        \item[--] Example on poker cards 
+        \item[--] Report writeup 
+      \end{itemize}
+
+      \textbf{Linlin Li}, Master's in Statistical Science, Duke University.
+      \begin{itemize}[leftmargin = 7mm]
+        \item[--] Co-author of the package
+        \item[--] Unit tests
+        \item[--] Example on Tetris blocks
+        \item[--] Package maintenance 
+      \end{itemize}
 \end{appendices}
 
 \end{document}
